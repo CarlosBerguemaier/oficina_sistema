@@ -11,7 +11,16 @@
 <body class="bg-light">
 
 <div class="container py-4 max-w-custom">
-    <h2 class="text-center mb-4">Nova Ordem de Serviço</h2>
+  <h2 class="text-center mb-4" id="tituloPagina">Nova Ordem de Serviço</h2>
+
+    <!-- Menu de Navegação -->
+    <div class="d-flex justify-content-center mb-4 gap-2">
+        <button id="btnAbaNovaOS" class="btn btn-primary w-50">Criar Nova OS</button>
+        <button id="btnAbaConsulta" class="btn btn-outline-primary w-50">Consultar OS</button>
+    </div>
+
+    <!-- Container da Nova OS -->
+    <div id="containerNovaOS">
 
     <!-- Seção 1: Busca pela Placa -->
     <div class="card shadow-sm mb-4">
@@ -131,6 +140,66 @@
             <button type="button" id="btnCancelar" class="btn btn-outline-danger btn-lg w-50">Cancelar</button>
             <button type="submit" class="btn btn-success btn-lg w-50">Salvar Ordem</button>
         </div>
+
+        </div> <!-- Fim containerNovaOS -->
+
+    <!-- Container de Consulta de OS (Escondido por padrão) -->
+    <div id="containerConsultaOS" class="d-none">
+        <!-- Filtros -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">Filtros de Busca</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Data Exata</label>
+                        <input type="date" id="filtroData" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Placa</label>
+                        <input type="text" id="filtroPlaca" class="form-control text-uppercase" placeholder="ABC-1234">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Marca</label>
+                        <input type="text" id="filtroMarca" class="form-control text-uppercase" placeholder="Ex: CHEVROLET">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Modelo</label>
+                        <input type="text" id="filtroModelo" class="form-control text-uppercase" placeholder="Ex: ONIX">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end mt-2">
+                    <button id="btnLimparFiltros" class="btn btn-outline-secondary me-2">Limpar</button>
+                    <button id="btnAplicarFiltros" class="btn btn-primary">Buscar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela e Paginação -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">Ordens de Serviço Cadastradas</div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data</th>
+                            <th>Placa</th>
+                            <th>Veículo</th>
+                            <th>Cliente</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaOSBody">
+                        <tr><td colspan="5" class="text-center py-3">Aguardando busca...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-between align-items-center bg-white">
+                <button id="btnPaginaAnterior" class="btn btn-sm btn-outline-primary" disabled>Anterior</button>
+                <span id="textoPaginacao" class="text-muted small fw-bold">Página 1</span>
+                <button id="btnPaginaProxima" class="btn btn-sm btn-outline-primary" disabled>Próxima</button>
+            </div>
+        </div>
+    </div>
     </form>
 </div>
 

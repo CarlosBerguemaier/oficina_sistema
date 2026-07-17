@@ -1,6 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE (Cole as suas chaves aqui)
 // ==========================================
@@ -222,6 +221,8 @@ class BancoDeDados {
         }
     }
 
+
+    
     async salvarNovaOS(dadosOS) {
         try {
             // Salva a Ordem de Serviço
@@ -245,6 +246,25 @@ class BancoDeDados {
             throw error;
         }
     }
+
+    async buscarUltimasOS() {
+        try {
+            const osRef = collection(this.db, "ordens_servico");
+            // Busca as últimas 200 OSs ordenadas pela data de entrada
+            const q = query(osRef, orderBy("dataEntrada", "desc"), limit(200));
+            const querySnapshot = await getDocs(q);
+            
+            let listaOS = [];
+            querySnapshot.forEach((doc) => {
+                listaOS.push({ id: doc.id, ...doc.data() });
+            });
+            return listaOS;
+        } catch (error) {
+            console.error("Erro ao buscar histórico de OS:", error);
+            throw error;
+        }
+    }
+
 }
 
 // ==========================================
@@ -390,6 +410,13 @@ class App {
     constructor() {
         this.bd = new BancoDeDados(db);
         this.ui = new Interface();
+        // Variáveis de controle para a Consulta
+        this.todasAsOS = [];
+        this.osFiltradas = [];
+        this.paginaAtual = 1;
+        this.itensPorPagina = 10;
+        
+        this.inicializarEventosConsulta();
         
         this.inicializarEventos();
         
@@ -514,7 +541,11 @@ class App {
         const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
         const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
 
+        // GERA A DATA NO FORMATO YYYY-MM-DD PARA FACILITAR O FILTRO
+        const dataAtualString = new Date().toISOString().split('T')[0];
+
         const dadosNovaOS = {
+            data: dataAtualString, // <--- NOVO CAMPO ADICIONADO AQUI
             placa: this.ui.inputPlaca.value.toUpperCase(),
             nomeCliente: document.getElementById("nomeCliente").value,
             marcaCarro: marcaFinal,
@@ -541,6 +572,142 @@ class App {
             alert("Erro ao salvar os dados.");
         }
     }
+
+    inicializarEventosConsulta() {
+        const btnNova = document.getElementById("btnAbaNovaOS");
+        const btnConsulta = document.getElementById("btnAbaConsulta");
+        const containerNova = document.getElementById("containerNovaOS");
+        const containerConsulta = document.getElementById("containerConsultaOS");
+        const titulo = document.getElementById("tituloPagina");
+
+        // Alternar para tela de Nova OS
+        btnNova.addEventListener("click", () => {
+            containerNova.classList.remove("d-none");
+            containerConsulta.classList.add("d-none");
+            btnNova.classList.replace("btn-outline-primary", "btn-primary");
+            btnConsulta.classList.replace("btn-primary", "btn-outline-primary");
+            titulo.textContent = "Nova Ordem de Serviço";
+        });
+
+        // Alternar para tela de Consulta
+        btnConsulta.addEventListener("click", () => {
+            containerConsulta.classList.remove("d-none");
+            containerNova.classList.add("d-none");
+            btnConsulta.classList.replace("btn-outline-primary", "btn-primary");
+            btnNova.classList.replace("btn-primary", "btn-outline-primary");
+            titulo.textContent = "Consultar Ordens de Serviço";
+            this.carregarDadosIniciaisConsulta();
+        });
+
+        // Botões de Filtro e Paginação
+        document.getElementById("btnAplicarFiltros").addEventListener("click", () => this.aplicarFiltros());
+        document.getElementById("btnLimparFiltros").addEventListener("click", () => {
+            document.getElementById("filtroData").value = "";
+            document.getElementById("filtroPlaca").value = "";
+            document.getElementById("filtroMarca").value = "";
+            document.getElementById("filtroModelo").value = "";
+            this.aplicarFiltros();
+        });
+
+        document.getElementById("btnPaginaAnterior").addEventListener("click", () => {
+            if (this.paginaAtual > 1) {
+                this.paginaAtual--;
+                this.renderizarTabelaOS();
+            }
+        });
+
+        document.getElementById("btnPaginaProxima").addEventListener("click", () => {
+            const maxPaginas = Math.ceil(this.osFiltradas.length / this.itensPorPagina);
+            if (this.paginaAtual < maxPaginas) {
+                this.paginaAtual++;
+                this.renderizarTabelaOS();
+            }
+        });
+    }
+
+    async carregarDadosIniciaisConsulta() {
+        document.getElementById("tabelaOSBody").innerHTML = '<tr><td colspan="5" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Carregando informações...</td></tr>';
+        try {
+            this.todasAsOS = await this.bd.buscarUltimasOS();
+            this.osFiltradas = [...this.todasAsOS]; // Começa mostrando todas
+            this.paginaAtual = 1;
+            this.renderizarTabelaOS();
+        } catch (error) {
+            document.getElementById("tabelaOSBody").innerHTML = '<tr><td colspan="5" class="text-center py-3 text-danger">Erro ao carregar do banco de dados.</td></tr>';
+        }
+    }
+
+    aplicarFiltros() {
+        const dataBusca = document.getElementById("filtroData").value;
+        const placaBusca = document.getElementById("filtroPlaca").value.toUpperCase().trim();
+        const marcaBusca = document.getElementById("filtroMarca").value.toUpperCase().trim();
+        const modeloBusca = document.getElementById("filtroModelo").value.toUpperCase().trim();
+
+        // Filtra a lista mantida na memória
+        this.osFiltradas = this.todasAsOS.filter(os => {
+            let passa = true;
+            // Valida a data nova (os.data) ou converte a data antiga (os.dataEntrada)
+            if (dataBusca) {
+                const dataOsFormatada = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : null);
+                if (dataOsFormatada !== dataBusca) passa = false;
+            }
+            if (placaBusca && (!os.placa || !os.placa.includes(placaBusca))) passa = false;
+            if (marcaBusca && (!os.marcaCarro || !os.marcaCarro.toUpperCase().includes(marcaBusca))) passa = false;
+            if (modeloBusca && (!os.modeloCarro || !os.modeloCarro.toUpperCase().includes(modeloBusca))) passa = false;
+            
+            return passa;
+        });
+
+        this.paginaAtual = 1; // Reseta para a página 1 após filtrar
+        this.renderizarTabelaOS();
+    }
+
+    renderizarTabelaOS() {
+        const tbody = document.getElementById("tabelaOSBody");
+        tbody.innerHTML = "";
+
+        if (this.osFiltradas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted">Nenhuma ordem de serviço encontrada.</td></tr>';
+            document.getElementById("textoPaginacao").textContent = "Página 1 de 1";
+            document.getElementById("btnPaginaAnterior").disabled = true;
+            document.getElementById("btnPaginaProxima").disabled = true;
+            return;
+        }
+
+        // Cálculos de paginação
+        const inicio = (this.paginaAtual - 1) * this.itensPorPagina;
+        const fim = inicio + this.itensPorPagina;
+        const osPaginadas = this.osFiltradas.slice(inicio, fim);
+
+        // Renderiza as linhas
+        osPaginadas.forEach(os => {
+            const tr = document.createElement("tr");
+            
+            // Tratamento visual para exibir no formato DD/MM/YYYY
+            let dataExibicao = "N/A";
+            const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : null);
+            if (dataBase) {
+                const partes = dataBase.split('-');
+                if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+
+            tr.innerHTML = `
+                <td>${dataExibicao}</td>
+                <td class="fw-bold">${os.placa || '-'}</td>
+                <td>${os.marcaCarro || '-'} ${os.modeloCarro || '-'}</td>
+                <td>${os.nomeCliente || '-'}</td>
+                <td class="text-success fw-bold">R$ ${(os.valorTotal || 0).toFixed(2)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Atualiza controles de navegação
+        const maxPaginas = Math.ceil(this.osFiltradas.length / this.itensPorPagina);
+        document.getElementById("textoPaginacao").textContent = `Página ${this.paginaAtual} de ${maxPaginas || 1}`;
+        document.getElementById("btnPaginaAnterior").disabled = this.paginaAtual === 1;
+        document.getElementById("btnPaginaProxima").disabled = this.paginaAtual === maxPaginas;
+    }
+
 }
 
 // Inicia a aplicação

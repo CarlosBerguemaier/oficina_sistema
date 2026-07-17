@@ -149,9 +149,11 @@ class App {
     }
 
     async lidarComSalvamento(evento) {
-        evento.preventDefault(); // Impede a página de recarregar
+     // Pega os valores digitados. Se estiver vazio, considera como 0 (zero).
+        const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
+        const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
+        const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
 
-        // Coleta os dados do DOM
         const dadosNovaOS = {
             placa: this.ui.inputPlaca.value.toUpperCase(),
             nomeCliente: document.getElementById("nomeCliente").value,
@@ -159,19 +161,13 @@ class App {
             kmEntrada: document.getElementById("kmEntrada").value,
             kmSaida: document.getElementById("kmSaida").value,
             descricao: document.getElementById("descricao").value,
-            valorTotal: document.getElementById("valorTotal").value,
-            mecanico: document.getElementById("mecanico").value,
-            valorRepasse: document.getElementById("valorRepasse").value || 0,
+            valorTotal: valorTotal,
+            comissao: {
+                carlos: repasseCarlos,
+                ratinho: repasseRatinho
+            },
             dataEntrada: new Date().toISOString()
         };
-
-        try {
-            await this.bd.salvarNovaOS(dadosNovaOS);
-            alert("Ordem de serviço salva com sucesso!");
-            this.ui.limparFormulario();
-        } catch (error) {
-            alert("Erro ao salvar os dados.");
-        }
     }
 }
 

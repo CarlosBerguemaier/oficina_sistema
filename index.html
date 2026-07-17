@@ -69,28 +69,25 @@
             </div>
         </div>
 
-        <!-- Fechamento e Comissão -->
+<!-- Fechamento e Comissão -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-secondary text-white">Faturamento e Repasse</div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label">Valor Cobrado (R$)</label>
+                    <label class="form-label">Valor Cobrado do Cliente (R$)</label>
                     <input type="number" id="valorTotal" step="0.01" class="form-control form-control-lg text-success fw-bold" required>
                 </div>
                 <div class="row">
                     <div class="col-6 mb-3">
-                        <label class="form-label">Executado por:</label>
-                        <select id="mecanico" class="form-select">
-                            <option value="pai">Pai (Sem repasse)</option>
-                            <option value="carlos">Carlos</option>
-                            <option value="ratinho">Ratinho</option>
-                        </select>
+                        <label class="form-label text-primary">Repasse Carlos (R$)</label>
+                        <input type="number" id="repasseCarlos" step="0.01" class="form-control" placeholder="0.00">
                     </div>
                     <div class="col-6 mb-3">
-                        <label class="form-label">Valor Repasse (R$)</label>
-                        <input type="number" id="valorRepasse" step="0.01" class="form-control" placeholder="0.00">
+                        <label class="form-label text-primary">Repasse Ratinho (R$)</label>
+                        <input type="number" id="repasseRatinho" step="0.01" class="form-control" placeholder="0.00">
                     </div>
                 </div>
+                <div class="form-text mt-0">Deixe zerado se não houver repasse para um dos dois. O restante do valor fica para a oficina.</div>
             </div>
         </div>
 

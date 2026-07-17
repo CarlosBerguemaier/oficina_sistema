@@ -513,8 +513,8 @@ renderizarLista(lista) {
         document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
         document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
         document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
-        document.getElementById('btnConsultar').addEventListener('click', () => this.lidarComConsulta());
-
+        document.getElementById('btnConsultar').addEventListener('click', () => this.lidarComConsulta());   
+        document.getElementById('btnBuscarFiltrado').addEventListener('click', () => this.lidarComBuscaFiltrada());
         // Mudança na MARCA
         this.ui.selectMarca.addEventListener("change", (e) => {
             const marca = e.target.value;

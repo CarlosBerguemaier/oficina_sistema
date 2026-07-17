@@ -4,14 +4,15 @@ import { getFirestore, collection, addDoc, query, where, getDocs } from "https:/
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE
 // ==========================================
-const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    projectId: "SEU_PROJETO",
-    storageBucket: "SEU_PROJETO.appspot.com",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SEU_APP_ID"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyCZ8ni2wDRPP3UzFEBCXpldSg9xcrhXvNg",
+    authDomain: "oficinaberguemaier-d75a5.firebaseapp.com",
+    projectId: "oficinaberguemaier-d75a5",
+    storageBucket: "oficinaberguemaier-d75a5.firebasestorage.app",
+    messagingSenderId: "563626978882",
+    appId: "1:563626978882:web:0b48ff9ce91ca7e24047db",
+    measurementId: "G-T3NSLZSZ28"
+  };
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getFirestore(appFirebase);

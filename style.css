@@ -1,0 +1,15 @@
+/* Limita a largura no desktop para não ficar esticado, e ocupa 100% no celular */
+.max-w-custom {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Facilita o toque em dispositivos móveis */
+input, select, textarea, button {
+    font-size: 16px !important; /* Evita zoom automático no iOS */
+}
+
+/* Transição suave ao mostrar/esconder o formulário */
+.d-none {
+    display: none !important;
+}

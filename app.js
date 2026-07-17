@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ==========================================
-// 1. CONFIGURAÇÃO DO FIREBASE
+// 1. CONFIGURAÇÃO DO FIREBASE (Cole as suas chaves aqui)
 // ==========================================
   const firebaseConfig = {
     apiKey: "AIzaSyCZ8ni2wDRPP3UzFEBCXpldSg9xcrhXvNg",
@@ -18,356 +18,7 @@ const appFirebase = initializeApp(firebaseConfig);
 const db = getFirestore(appFirebase);
 
 // ==========================================
-// 2. CAMADA DE BANCO DE DADOS (Model)
-// ==========================================
-class BancoDeDados {
-    constructor(db) {
-        this.db = db;
-    }
-
-    async buscarVeiculoPorPlaca(placa) {
-        try {
-            const veiculosRef = collection(this.db, "veiculos");
-            const q = query(veiculosRef, where("placa", "==", placa.toUpperCase()));
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-                // Retorna o primeiro veículo encontrado e seus dados
-                return querySnapshot.docs[0].data();
-            }
-            return null; // Primeira vez na oficina
-        } catch (error) {
-            console.error("Erro ao buscar placa:", error);
-            throw error;
-        }
-    }
-
-    async salvarNovaOS(dadosOS) {
-        try {
-            const osRef = collection(this.db, "ordens_servico");
-            await addDoc(osRef, dadosOS);
-            // Aqui você também implementaria a lógica de salvar Cliente/Veiculo 
-            // caso seja a primeira vez deles.
-            return true;
-        } catch (error) {
-            console.error("Erro ao salvar OS:", error);
-            throw error;
-        }
-    }
-}
-
-// ==========================================
-// 3. CAMADA DE INTERFACE (View)
-// ==========================================
-class Interface {
- mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
-        this.formOS.classList.remove("d-none");
-        
-        if (veiculoExiste) {
-            this.alertaBusca.innerHTML = `<span class="text-success fw-bold">Veículo encontrado!</span>`;
-            this.inputNome.value = dadosVeiculo.nomeCliente || ""; 
-            
-            // 1. Preenche a MARCA (Select)
-            if (dadosVeiculo.marcaCarro) {
-                if (!frotaBrasil[dadosVeiculo.marcaCarro]) {
-                    this.selectMarca.value = "OUTRA";
-                    this.inputOutraMarca.classList.remove("d-none");
-                    this.inputOutraMarca.value = dadosVeiculo.marcaCarro;
-                } else {
-                    this.selectMarca.value = dadosVeiculo.marcaCarro;
-                    // Simula uma mudança para o sistema liberar a lista de modelos
-                    this.selectMarca.dispatchEvent(new Event("change"));
-                }
-            }
-            
-            // 2. Preenche o MODELO (Select)
-            if (dadosVeiculo.modeloCarro) {
-                if (this.selectMarca.value === "OUTRA" || !frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro]) {
-                    this.selectModelo.value = "OUTRO";
-                    this.inputOutroModelo.classList.remove("d-none");
-                    this.inputOutroModelo.value = dadosVeiculo.modeloCarro;
-                } else {
-                    this.selectModelo.value = dadosVeiculo.modeloCarro;
-                    // Simula uma mudança para o sistema liberar os motores
-                    this.selectModelo.dispatchEvent(new Event("change"));
-                }
-            }
-
-            // 3. Preenche a LITRAGEM (Select)
-            if (dadosVeiculo.litragemCarro) {
-                let motorNaLista = false;
-                if (frotaBrasil[dadosVeiculo.marcaCarro] && frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro]) {
-                    motorNaLista = frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro].includes(dadosVeiculo.litragemCarro);
-                }
-
-                if (!motorNaLista) {
-                    this.selectLitragem.value = "OUTRO";
-                    this.inputOutraLitragem.classList.remove("d-none");
-                    this.inputOutraLitragem.value = dadosVeiculo.litragemCarro;
-                } else {
-                    this.selectLitragem.value = dadosVeiculo.litragemCarro;
-                }
-            }
-            
-            this.inputAno.value = dadosVeiculo.anoCarro || "";
-            this.areaHistorico.classList.remove("d-none");
-        } else {
-            // Se for a primeira vez do cliente
-            this.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Preencha os dados.</span>`;
-            this.inputNome.value = "";
-            this.selectMarca.value = "";
-            this.inputOutraMarca.value = "";
-            this.inputOutraMarca.classList.add("d-none");
-            
-            this.selectModelo.innerHTML = '<option value="">Aguardando marca...</option>';
-            this.selectModelo.disabled = true;
-            this.inputOutroModelo.value = "";
-            this.inputOutroModelo.classList.add("d-none");
-            
-            this.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
-            this.selectLitragem.disabled = true;
-            this.inputOutraLitragem.value = "";
-            this.inputOutraLitragem.classList.add("d-none");
-            
-            this.inputAno.value = "";
-            this.areaHistorico.classList.add("d-none");
-        }
-    }
-}
-
-// ==========================================
-// 4. CONTROLADOR DA APLICAÇÃO (Controller)
-// ==========================================
-class App {
-    constructor() {
-        this.bd = new BancoDeDados(db);
-        this.ui = new Interface();
-        
-        this.inicializarEventos();
-    }
-
-   inicializarEventos() {
-        document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
-        document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
-        document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
-
-        // GATILHO 1: Quando escolhe a MARCA
-        this.ui.selectMarca.addEventListener("change", (e) => {
-            const marca = e.target.value;
-            this.ui.selectModelo.innerHTML = '<option value="">Selecione o modelo...</option>';
-            this.ui.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
-            this.ui.selectLitragem.disabled = true;
-            
-            // Esconde tudo de manuais pra resetar a tela
-            this.ui.inputOutraMarca.classList.add("d-none");
-            this.ui.inputOutroModelo.classList.add("d-none");
-            this.ui.inputOutraLitragem.classList.add("d-none");
-
-            if (marca === "OUTRA") {
-                this.ui.inputOutraMarca.classList.remove("d-none");
-                this.ui.selectModelo.disabled = true;
-                this.ui.inputOutroModelo.classList.remove("d-none"); // Pede o modelo manual
-                this.ui.selectLitragem.disabled = true;
-                this.ui.inputOutraLitragem.classList.remove("d-none"); // Pede a litragem manual
-            } else if (marca !== "") {
-                this.ui.selectModelo.disabled = false;
-                // Preenche os modelos dessa marca
-                Object.keys(frotaBrasil[marca]).sort().forEach(modelo => {
-                    const opt = document.createElement("option");
-                    opt.value = modelo;
-                    opt.textContent = modelo;
-                    this.ui.selectModelo.appendChild(opt);
-                });
-                // Opção manual para modelos não mapeados
-                const optOutro = document.createElement("option");
-                optOutro.value = "OUTRO";
-                optOutro.textContent = "Outro modelo...";
-                this.ui.selectModelo.appendChild(optOutro);
-            } else {
-                this.ui.selectModelo.disabled = true;
-            }
-        });
-
-        // GATILHO 2: Quando escolhe o MODELO
-        this.ui.selectModelo.addEventListener("change", (e) => {
-            const modelo = e.target.value;
-            const marcaSelecionada = this.ui.selectMarca.value;
-            this.ui.selectLitragem.innerHTML = '<option value="">Selecione o motor...</option>';
-            
-            this.ui.inputOutroModelo.classList.add("d-none");
-            this.ui.inputOutraLitragem.classList.add("d-none");
-
-            if (modelo === "OUTRO") {
-                this.ui.inputOutroModelo.classList.remove("d-none");
-                this.ui.selectLitragem.disabled = true;
-                this.ui.inputOutraLitragem.classList.remove("d-none");
-            } else if (modelo !== "") {
-                this.ui.selectLitragem.disabled = false;
-                // Puxa as litragens exatas daquele modelo
-                const motores = frotaBrasil[marcaSelecionada][modelo];
-                motores.forEach(motor => {
-                    const opt = document.createElement("option");
-                    opt.value = motor;
-                    opt.textContent = motor;
-                    this.ui.selectLitragem.appendChild(opt);
-                });
-                const optOutro = document.createElement("option");
-                optOutro.value = "OUTRO";
-                optOutro.textContent = "Outro motor...";
-                this.ui.selectLitragem.appendChild(optOutro);
-            } else {
-                this.ui.selectLitragem.disabled = true;
-            }
-        });
-
-        // GATILHO 3: Quando escolhe a LITRAGEM
-        this.ui.selectLitragem.addEventListener("change", (e) => {
-            if (e.target.value === "OUTRO") {
-                this.ui.inputOutraLitragem.classList.remove("d-none");
-            } else {
-                this.ui.inputOutraLitragem.classList.add("d-none");
-            }
-        });
-    }
-
- async lidarComBuscaPlaca() {
-        const placa = this.ui.inputPlaca.value.trim();
-        if (placa.length < 7) {
-            alert("Digite uma placa válida.");
-            return;
-        }
-
-        this.ui.mostrarCarregando(true);
-
-        try {
-            const veiculo = await this.bd.buscarVeiculoPorPlaca(placa);
-            if (veiculo) {
-                this.ui.mostrarFormulario(true, veiculo);
-            } else {
-                this.ui.mostrarFormulario(false);
-            }
-        } catch (error) {
-            // Agora o erro exato vai aparecer no F12 para nós!
-            console.error("ERRO DETALHADO DO FIREBASE:", error);
-            alert("Erro de conexão com o banco de dados. Verifique o Console (F12).");
-            // Garante que o formulário NÃO abra se der erro
-            this.ui.formOS.classList.add("d-none"); 
-        } finally {
-            this.ui.mostrarCarregando(false);
-        }
-    }
-
-   async lidarComSalvamento(evento) {
-        evento.preventDefault();
-
-        // 1. As três linhas entram aqui! Elas extraem o valor final (da lista ou digitado)
-        let marcaFinal = this.ui.selectMarca.value === "OUTRA" ? this.ui.inputOutraMarca.value.trim().toUpperCase() : this.ui.selectMarca.value;
-        let modeloFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO") ? this.ui.inputOutroModelo.value.trim().toUpperCase() : this.ui.selectModelo.value;
-        let litragemFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO" || this.ui.selectLitragem.value === "OUTRO") ? this.ui.inputOutraLitragem.value.trim().toUpperCase() : this.ui.selectLitragem.value;
-
-        // 2. Pega os valores financeiros
-        const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
-        const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
-        const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
-
-        // 3. Monta o pacote de dados com as variáveis "Final" que criamos acima
-        const dadosNovaOS = {
-            placa: this.ui.inputPlaca.value.toUpperCase(),
-            nomeCliente: document.getElementById("nomeCliente").value,
-            marcaCarro: marcaFinal,
-            modeloCarro: modeloFinal,
-            litragemCarro: litragemFinal,
-            anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
-            kmEntrada: parseInt(document.getElementById("kmEntrada").value) || 0,
-            kmSaida: parseInt(document.getElementById("kmSaida").value) || 0,
-            descricao: document.getElementById("descricao").value,
-            valorTotal: valorTotal,
-            comissao: {
-                carlos: repasseCarlos,
-                ratinho: repasseRatinho
-            },
-            dataEntrada: new Date().toISOString()
-        };
-
-        // 4. Envia para o Firebase
-        try {
-            await this.bd.salvarNovaOS(dadosNovaOS);
-            alert("Ordem de serviço salva com sucesso!");
-            this.ui.limparFormulario();
-        } catch (error) {
-            console.error(error);
-            alert("Erro ao salvar os dados.");
-        }
-    }
-
-    inicializarEventos() {
-        document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
-        document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
-        
-        // Evento: Botão de Cancelar
-        document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
-
-        // Evento: Quando o usuário muda a marca no select
-        document.getElementById("marcaCarro").addEventListener("change", (e) => {
-            const marca = e.target.value;
-            if (marca === "OUTRA") {
-                this.ui.inputOutraMarca.classList.remove("d-none");
-                this.ui.inputOutraMarca.required = true;
-                this.ui.datalistModelos.innerHTML = ""; // Deixa os modelos vazios
-            } else {
-                this.ui.inputOutraMarca.classList.add("d-none");
-                this.ui.inputOutraMarca.required = false;
-                this.ui.atualizarModelos(marca);
-            }
-        });
-    }
-
-    async lidarComSalvamento(evento) {
-        evento.preventDefault();
-
-        // Verifica qual marca foi selecionada (a da lista ou a digitada manualmente)
-        let marcaFinal = document.getElementById("marcaCarro").value;
-        if (marcaFinal === "OUTRA") {
-            marcaFinal = document.getElementById("outraMarca").value.trim().toUpperCase();
-        }
-
-        const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
-        const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
-        const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
-
-        const dadosNovaOS = {
-            placa: this.ui.inputPlaca.value.toUpperCase(),
-            nomeCliente: document.getElementById("nomeCliente").value,
-            marcaCarro: marcaFinal,
-            modeloCarro: document.getElementById("modeloCarro").value.toUpperCase(),
-            litragemCarro: document.getElementById("litragemCarro").value,
-            anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
-            kmEntrada: parseInt(document.getElementById("kmEntrada").value) || 0,
-            kmSaida: parseInt(document.getElementById("kmSaida").value) || 0,
-            descricao: document.getElementById("descricao").value,
-            valorTotal: valorTotal,
-            comissao: {
-                carlos: repasseCarlos,
-                ratinho: repasseRatinho
-            },
-            dataEntrada: new Date().toISOString()
-        };
-
-        try {
-            await this.bd.salvarNovaOS(dadosNovaOS);
-            alert("Ordem de serviço salva com sucesso!");
-            this.ui.limparFormulario();
-        } catch (error) {
-            alert("Erro ao salvar os dados.");
-        }
-    }
-
-    
-
-    
-}
-// ==========================================
-// MEGA BANCO DE DADOS LOCAL (Anos 80, 90, 00, 10 e 20)
+// 2. MEGA BANCO DE DADOS LOCAL (Cascata)
 // ==========================================
 const frotaBrasil = {
     "Chevrolet": {
@@ -546,5 +197,351 @@ const frotaBrasil = {
         "L200 (Triton / Savana)": ["2.4 Diesel", "2.5 Diesel", "3.2 Diesel", "3.5 V6"]
     }
 };
+
+// ==========================================
+// 3. CAMADA DE BANCO DE DADOS
+// ==========================================
+class BancoDeDados {
+    constructor(db) {
+        this.db = db;
+    }
+
+    async buscarVeiculoPorPlaca(placa) {
+        try {
+            const veiculosRef = collection(this.db, "veiculos");
+            const q = query(veiculosRef, where("placa", "==", placa.toUpperCase()));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                return querySnapshot.docs[0].data();
+            }
+            return null; 
+        } catch (error) {
+            console.error("Erro ao buscar placa:", error);
+            throw error;
+        }
+    }
+
+    async salvarNovaOS(dadosOS) {
+        try {
+            // Salva a Ordem de Serviço
+            const osRef = collection(this.db, "ordens_servico");
+            await addDoc(osRef, dadosOS);
+
+            // Atualiza ou Cria o cadastro do Veículo no banco para preencher sozinho na próxima vez
+            const veiculoRef = doc(this.db, "veiculos", dadosOS.placa);
+            await setDoc(veiculoRef, {
+                placa: dadosOS.placa,
+                nomeCliente: dadosOS.nomeCliente,
+                marcaCarro: dadosOS.marcaCarro,
+                modeloCarro: dadosOS.modeloCarro,
+                litragemCarro: dadosOS.litragemCarro,
+                anoCarro: dadosOS.anoCarro
+            }, { merge: true });
+
+            return true;
+        } catch (error) {
+            console.error("Erro ao salvar OS:", error);
+            throw error;
+        }
+    }
+}
+
+// ==========================================
+// 4. CAMADA DE INTERFACE
+// ==========================================
+class Interface {
+    constructor() {
+        this.formOS = document.getElementById("formOS");
+        this.alertaBusca = document.getElementById("alertaBusca");
+        this.areaHistorico = document.getElementById("areaHistorico");
+        
+        // Inputs
+        this.inputPlaca = document.getElementById("placaBusca");
+        this.inputNome = document.getElementById("nomeCliente");
+        
+        // Selects em Cascata
+        this.selectMarca = document.getElementById("marcaCarro");
+        this.inputOutraMarca = document.getElementById("outraMarca");
+        
+        this.selectModelo = document.getElementById("modeloCarro");
+        this.inputOutroModelo = document.getElementById("outroModelo");
+        
+        this.selectLitragem = document.getElementById("litragemCarro");
+        this.inputOutraLitragem = document.getElementById("outraLitragem");
+        
+        this.inputAno = document.getElementById("anoCarro");
+
+        this.carregarMarcas();
+    }
+
+    carregarMarcas() {
+        Object.keys(frotaBrasil).sort().forEach(marca => {
+            const option = document.createElement("option");
+            option.value = marca;
+            option.textContent = marca;
+            this.selectMarca.insertBefore(option, this.selectMarca.lastElementChild);
+        });
+    }
+
+    mostrarCarregando(buscando) {
+        const btn = document.getElementById("btnBuscarPlaca");
+        if (buscando) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            btn.disabled = true;
+        } else {
+            btn.innerHTML = 'Buscar';
+            btn.disabled = false;
+        }
+    }
+
+    mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
+        this.formOS.classList.remove("d-none");
+        
+        if (veiculoExiste) {
+            this.alertaBusca.innerHTML = `<span class="text-success fw-bold">Veículo encontrado!</span>`;
+            this.inputNome.value = dadosVeiculo.nomeCliente || ""; 
+            
+            // Preenche a MARCA
+            if (dadosVeiculo.marcaCarro) {
+                if (!frotaBrasil[dadosVeiculo.marcaCarro]) {
+                    this.selectMarca.value = "OUTRA";
+                    this.inputOutraMarca.classList.remove("d-none");
+                    this.inputOutraMarca.value = dadosVeiculo.marcaCarro;
+                } else {
+                    this.selectMarca.value = dadosVeiculo.marcaCarro;
+                    this.selectMarca.dispatchEvent(new Event("change"));
+                }
+            }
+            
+            // Preenche o MODELO
+            if (dadosVeiculo.modeloCarro) {
+                if (this.selectMarca.value === "OUTRA" || !frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro]) {
+                    this.selectModelo.value = "OUTRO";
+                    this.inputOutroModelo.classList.remove("d-none");
+                    this.inputOutroModelo.value = dadosVeiculo.modeloCarro;
+                } else {
+                    this.selectModelo.value = dadosVeiculo.modeloCarro;
+                    this.selectModelo.dispatchEvent(new Event("change"));
+                }
+            }
+
+            // Preenche a LITRAGEM
+            if (dadosVeiculo.litragemCarro) {
+                let motorNaLista = false;
+                if (frotaBrasil[dadosVeiculo.marcaCarro] && frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro]) {
+                    motorNaLista = frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro].includes(dadosVeiculo.litragemCarro);
+                }
+
+                if (!motorNaLista) {
+                    this.selectLitragem.value = "OUTRO";
+                    this.inputOutraLitragem.classList.remove("d-none");
+                    this.inputOutraLitragem.value = dadosVeiculo.litragemCarro;
+                } else {
+                    this.selectLitragem.value = dadosVeiculo.litragemCarro;
+                }
+            }
+            
+            this.inputAno.value = dadosVeiculo.anoCarro || "";
+            this.areaHistorico.classList.remove("d-none");
+        } else {
+            this.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Preencha os dados.</span>`;
+            this.inputNome.value = "";
+            this.selectMarca.value = "";
+            this.inputOutraMarca.value = "";
+            this.inputOutraMarca.classList.add("d-none");
+            
+            this.selectModelo.innerHTML = '<option value="">Aguardando marca...</option>';
+            this.selectModelo.disabled = true;
+            this.inputOutroModelo.value = "";
+            this.inputOutroModelo.classList.add("d-none");
+            
+            this.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
+            this.selectLitragem.disabled = true;
+            this.inputOutraLitragem.value = "";
+            this.inputOutraLitragem.classList.add("d-none");
+            
+            this.inputAno.value = "";
+            this.areaHistorico.classList.add("d-none");
+        }
+    }
+
+    limparFormulario() {
+        this.formOS.reset();
+        this.formOS.classList.add("d-none");
+        this.inputPlaca.value = "";
+        this.alertaBusca.innerHTML = "";
+        
+        this.inputOutraMarca.classList.add("d-none");
+        this.inputOutroModelo.classList.add("d-none");
+        this.inputOutraLitragem.classList.add("d-none");
+        
+        this.selectModelo.disabled = true;
+        this.selectModelo.innerHTML = '<option value="">Aguardando marca...</option>';
+        this.selectLitragem.disabled = true;
+        this.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
+    }
+}
+
+// ==========================================
+// 5. CONTROLADOR PRINCIPAL
+// ==========================================
+class App {
+    constructor() {
+        this.bd = new BancoDeDados(db);
+        this.ui = new Interface();
+        
+        this.inicializarEventos();
+        
+        // Aquecimento silencioso da conexão
+        this.bd.buscarVeiculoPorPlaca("AQUECIMENTO").catch(() => {});
+    }
+
+    inicializarEventos() {
+        document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
+        document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
+        document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
+
+        // Mudança na MARCA
+        this.ui.selectMarca.addEventListener("change", (e) => {
+            const marca = e.target.value;
+            this.ui.selectModelo.innerHTML = '<option value="">Selecione o modelo...</option>';
+            this.ui.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
+            this.ui.selectLitragem.disabled = true;
+            
+            this.ui.inputOutraMarca.classList.add("d-none");
+            this.ui.inputOutroModelo.classList.add("d-none");
+            this.ui.inputOutraLitragem.classList.add("d-none");
+
+            if (marca === "OUTRA") {
+                this.ui.inputOutraMarca.classList.remove("d-none");
+                this.ui.selectModelo.disabled = true;
+                this.ui.inputOutroModelo.classList.remove("d-none"); 
+                this.ui.selectLitragem.disabled = true;
+                this.ui.inputOutraLitragem.classList.remove("d-none");
+            } else if (marca !== "") {
+                this.ui.selectModelo.disabled = false;
+                Object.keys(frotaBrasil[marca]).sort().forEach(modelo => {
+                    const opt = document.createElement("option");
+                    opt.value = modelo;
+                    opt.textContent = modelo;
+                    this.ui.selectModelo.appendChild(opt);
+                });
+                const optOutro = document.createElement("option");
+                optOutro.value = "OUTRO";
+                optOutro.textContent = "Outro modelo...";
+                this.ui.selectModelo.appendChild(optOutro);
+            } else {
+                this.ui.selectModelo.disabled = true;
+            }
+        });
+
+        // Mudança no MODELO
+        this.ui.selectModelo.addEventListener("change", (e) => {
+            const modelo = e.target.value;
+            const marcaSelecionada = this.ui.selectMarca.value;
+            this.ui.selectLitragem.innerHTML = '<option value="">Selecione o motor...</option>';
+            
+            this.ui.inputOutroModelo.classList.add("d-none");
+            this.ui.inputOutraLitragem.classList.add("d-none");
+
+            if (modelo === "OUTRO") {
+                this.ui.inputOutroModelo.classList.remove("d-none");
+                this.ui.selectLitragem.disabled = true;
+                this.ui.inputOutraLitragem.classList.remove("d-none");
+            } else if (modelo !== "") {
+                this.ui.selectLitragem.disabled = false;
+                const motores = frotaBrasil[marcaSelecionada][modelo];
+                motores.forEach(motor => {
+                    const opt = document.createElement("option");
+                    opt.value = motor;
+                    opt.textContent = motor;
+                    this.ui.selectLitragem.appendChild(opt);
+                });
+                const optOutro = document.createElement("option");
+                optOutro.value = "OUTRO";
+                optOutro.textContent = "Outro motor...";
+                this.ui.selectLitragem.appendChild(optOutro);
+            } else {
+                this.ui.selectLitragem.disabled = true;
+            }
+        });
+
+        // Mudança na LITRAGEM
+        this.ui.selectLitragem.addEventListener("change", (e) => {
+            if (e.target.value === "OUTRO") {
+                this.ui.inputOutraLitragem.classList.remove("d-none");
+            } else {
+                this.ui.inputOutraLitragem.classList.add("d-none");
+            }
+        });
+    }
+
+    async lidarComBuscaPlaca() {
+        const placa = this.ui.inputPlaca.value.trim();
+        if (placa.length < 7) {
+            alert("Digite uma placa válida.");
+            return;
+        }
+
+        this.ui.mostrarCarregando(true);
+
+        try {
+            const veiculo = await this.bd.buscarVeiculoPorPlaca(placa);
+            if (veiculo) {
+                this.ui.mostrarFormulario(true, veiculo);
+            } else {
+                this.ui.mostrarFormulario(false);
+            }
+        } catch (error) {
+            console.error("ERRO DETALHADO DO FIREBASE:", error);
+            alert("Erro de conexão com o banco de dados. Verifique o Console (F12).");
+            this.ui.formOS.classList.add("d-none"); 
+        } finally {
+            this.ui.mostrarCarregando(false);
+        }
+    }
+
+    async lidarComSalvamento(evento) {
+        evento.preventDefault();
+
+        // Extrai os valores finais dependendo de se o usuário usou as listas ou digitou
+        let marcaFinal = this.ui.selectMarca.value === "OUTRA" ? this.ui.inputOutraMarca.value.trim().toUpperCase() : this.ui.selectMarca.value;
+        let modeloFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO") ? this.ui.inputOutroModelo.value.trim().toUpperCase() : this.ui.selectModelo.value;
+        let litragemFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO" || this.ui.selectLitragem.value === "OUTRO") ? this.ui.inputOutraLitragem.value.trim().toUpperCase() : this.ui.selectLitragem.value;
+
+        const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
+        const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
+        const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
+
+        const dadosNovaOS = {
+            placa: this.ui.inputPlaca.value.toUpperCase(),
+            nomeCliente: document.getElementById("nomeCliente").value,
+            marcaCarro: marcaFinal,
+            modeloCarro: modeloFinal,
+            litragemCarro: litragemFinal,
+            anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
+            kmEntrada: parseInt(document.getElementById("kmEntrada").value) || 0,
+            kmSaida: parseInt(document.getElementById("kmSaida").value) || 0,
+            descricao: document.getElementById("descricao").value,
+            valorTotal: valorTotal,
+            comissao: {
+                carlos: repasseCarlos,
+                ratinho: repasseRatinho
+            },
+            dataEntrada: new Date().toISOString()
+        };
+
+        try {
+            await this.bd.salvarNovaOS(dadosNovaOS);
+            alert("Ordem de serviço salva com sucesso!");
+            this.ui.limparFormulario();
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao salvar os dados.");
+        }
+    }
+}
+
 // Inicia a aplicação
 const oficinaApp = new App();

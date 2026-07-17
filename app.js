@@ -60,91 +60,7 @@ class BancoDeDados {
 // 3. CAMADA DE INTERFACE (View)
 // ==========================================
 class Interface {
-   // Dentro do construtor da classe Interface:
-    constructor() {
-        this.formOS = document.getElementById("formOS");
-        this.alertaBusca = document.getElementById("alertaBusca");
-        this.areaHistorico = document.getElementById("areaHistorico");
-        
-        // Inputs
-        this.inputPlaca = document.getElementById("placaBusca");
-        this.inputNome = document.getElementById("nomeCliente");
-        
-        // Selects e Inputs Manuais
-        this.selectMarca = document.getElementById("marcaCarro");
-        this.inputOutraMarca = document.getElementById("outraMarca");
-        
-        this.selectModelo = document.getElementById("modeloCarro");
-        this.inputOutroModelo = document.getElementById("outroModelo");
-        
-        this.selectLitragem = document.getElementById("litragemCarro");
-        this.inputOutraLitragem = document.getElementById("outraLitragem");
-        
-        this.inputAno = document.getElementById("anoCarro");
-
-        this.carregarMarcas();
-    }
-
-    carregarMarcas() {
-        Object.keys(frotaBrasil).sort().forEach(marca => {
-            const option = document.createElement("option");
-            option.value = marca;
-            option.textContent = marca;
-            this.selectMarca.insertBefore(option, this.selectMarca.lastElementChild);
-        });
-    }
-
-    // Limpa o formulário e esconde os campos extras
-    limparFormulario() {
-        this.formOS.reset();
-        this.formOS.classList.add("d-none");
-        this.inputPlaca.value = "";
-        this.alertaBusca.innerHTML = "";
-        
-        this.inputOutraMarca.classList.add("d-none");
-        this.inputOutroModelo.classList.add("d-none");
-        this.inputOutraLitragem.classList.add("d-none");
-        
-        this.selectModelo.disabled = true;
-        this.selectModelo.innerHTML = '<option value="">Aguardando marca...</option>';
-        this.selectLitragem.disabled = true;
-        this.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
-    }
-
-    carregarMarcas() {
-        // Preenche o select de marcas dinamicamente usando a lista do topo do arquivo
-        Object.keys(frotaBrasil).sort().forEach(marca => {
-            const option = document.createElement("option");
-            option.value = marca;
-            option.textContent = marca;
-            // Insere antes da opção "OUTRA"
-            this.selectMarca.insertBefore(option, this.selectMarca.lastElementChild);
-        });
-    }
-
-    atualizarModelos(marca) {
-        this.datalistModelos.innerHTML = ""; // Limpa a lista atual
-        if (frotaBrasil[marca]) {
-            frotaBrasil[marca].sort().forEach(modelo => {
-                const option = document.createElement("option");
-                option.value = modelo;
-                this.datalistModelos.appendChild(option);
-            });
-        }
-    }
-
-    mostrarCarregando(buscando) {
-        const btn = document.getElementById("btnBuscarPlaca");
-        if (buscando) {
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            btn.disabled = true;
-        } else {
-            btn.innerHTML = 'Buscar';
-            btn.disabled = false;
-        }
-    }
-
-   mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
+ mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
         this.formOS.classList.remove("d-none");
         
         if (veiculoExiste) {
@@ -216,14 +132,6 @@ class Interface {
             this.inputAno.value = "";
             this.areaHistorico.classList.add("d-none");
         }
-    }
-
-    limparFormulario() {
-        this.formOS.reset();
-        this.formOS.classList.add("d-none");
-        this.inputPlaca.value = "";
-        this.alertaBusca.innerHTML = "";
-        this.inputOutraMarca.classList.add("d-none");
     }
 }
 

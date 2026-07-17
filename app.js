@@ -588,6 +588,13 @@ renderizarLista(lista) {
                 this.ui.inputOutraLitragem.classList.add("d-none");
             }
         });
+
+        const btnFiltro = document.getElementById('btnBuscarFiltrado');
+        if (btnFiltro) {
+            btnFiltro.addEventListener('click', () => this.lidarComBuscaFiltrada());
+        } else {
+            console.warn("Atenção: O botão 'btnBuscarFiltrado' não foi encontrado no HTML.");
+        }
     }
 
     async lidarComBuscaPlaca() {

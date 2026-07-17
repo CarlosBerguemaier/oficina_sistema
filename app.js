@@ -249,7 +249,9 @@ async buscarHistorico(placa) {
                 marcaCarro: dadosOS.marcaCarro,
                 modeloCarro: dadosOS.modeloCarro,
                 litragemCarro: dadosOS.litragemCarro,
-                anoCarro: dadosOS.anoCarro
+                anoCarro: dadosOS.anoCarro,
+                dataEntrada: new Date().toISOString(), // Grava a data no formato ISO
+                dataFormatada: new Date().toLocaleDateString('pt-BR') // Opcional: para exibir mais fácil
             }, { merge: true });
 
             return true;
@@ -411,7 +413,75 @@ class App {
     }
 
 
-    
+// Adicione dentro da classe BancoDeDados
+async buscarComFiltro(campo, valor) {
+    try {
+        const osRef = collection(this.db, "ordens_servico");
+        // Convertemos para maiúsculas para manter o padrão que você já usa nas placas
+        const valorBusca = valor.toUpperCase();
+        
+        // Query específica para o campo desejado
+        const q = query(osRef, where(campo, "==", valorBusca));
+        const snap = await getDocs(q);
+        
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Erro na busca filtrada:", error);
+        throw error;
+    }
+}
+
+// Adicione dentro da classe App
+async lidarComBuscaFiltrada() {
+    const campo = document.getElementById('selectTipoFiltro').value;
+    const valor = document.getElementById('inputFiltro').value.trim();
+    const container = document.getElementById('listaResultados');
+
+    if (!valor) { alert("Digite algo para buscar!"); return; }
+
+    container.innerHTML = "Buscando nos servidores...";
+
+    try {
+        const resultados = await this.bd.buscarComFiltro(campo, valor);
+        
+        if (resultados.length === 0) {
+            container.innerHTML = "Nenhum resultado encontrado.";
+            return;
+        }
+
+        container.innerHTML = resultados.map(os => `
+            <div class="card mb-2 shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Placa: ${os.placa} | Data: ${os.dataEntrada ? new Date(os.dataEntrada).toLocaleDateString() : 'N/A'}</h6>
+                    <p class="card-text">
+                        <strong>Cliente:</strong> ${os.nomeCliente}<br>
+                        <strong>Carro:</strong> ${os.marcaCarro} - ${os.modeloCarro}<br>
+                        <strong>Total:</strong> R$ ${os.valorTotal}
+                    </p>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = "Erro ao buscar. Verifique se o índice foi criado no Firebase.";
+    }
+}
+
+// Método auxiliar para não repetir código
+renderizarLista(lista) {
+    const container = document.getElementById('listaResultados');
+    container.innerHTML = lista.length === 0 ? "Nenhum resultado." : 
+        lista.map(os => `
+            <div class="card mb-2">
+                <div class="card-body p-2">
+                    <strong>Data:</strong> ${os.dataFormatada || 'N/A'} | <strong>Placa:</strong> ${os.placa}<br>
+                    <strong>Cliente:</strong> ${os.nomeCliente}<br>
+                    <strong>Carro:</strong> ${os.marcaCarro} ${os.modeloCarro}<br>
+                    <strong>Serviço:</strong> ${os.descricao}
+                </div>
+            </div>
+        `).join('');
+}
+
     async lidarComConsulta() {
         const placa = document.getElementById('buscaPlacaConsulta').value.trim().toUpperCase();
         const container = document.getElementById('listaResultados');

@@ -20,6 +20,8 @@
         <li class="nav-item"><button class="nav-link" onclick="mostrarTab('consultarOS')">Consultas</button></li>
     </ul>
 
+    
+
     <!-- ABA NOVA OS -->
     <div id="novaOS" class="tab-content active">
         <h2 class="text-center mb-4">Nova Ordem de Serviço</h2>
@@ -130,14 +132,26 @@
 
     <!-- ABA CONSULTA -->
     <div id="consultarOS" class="tab-content">
-        <h2 class="text-center mb-4">Consultar Histórico</h2>
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <input type="text" id="buscaPlacaConsulta" class="form-control" placeholder="Digite a placa (ex: ABC-1234)">
-                <button class="btn btn-secondary w-100 mt-2" id="btnConsultar">Buscar Histórico</button>
-                <div id="listaResultados" class="mt-3"></div>
-            </div>
+<div id="secaoConsulta" class="mt-4 p-3 border rounded">
+    <h5>Consulta de Ordens de Serviço</h5>
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <select id="selectTipoFiltro" class="form-select">
+                <option value="placa">Placa</option>
+                <option value="nomeCliente">Cliente</option>
+                <option value="marcaCarro">Marca</option>
+                <option value="modeloCarro">Modelo</option>
+            </select>
         </div>
+        <div class="col-md-6">
+            <input type="text" id="inputFiltro" class="form-control" placeholder="Digite o valor para busca...">
+        </div>
+        <div class="col-md-3">
+            <button id="btnBuscarFiltrado" class="btn btn-primary w-100">Buscar</button>
+        </div>
+    </div>
+    <div id="listaResultados"></div>
+</div>
     </div>
 </div>
 

@@ -206,6 +206,19 @@ class BancoDeDados {
         this.db = db;
     }
 
+async buscarHistorico(placa) {
+        try {
+            const osRef = collection(this.db, "ordens_servico");
+            // Nota: Você precisará de uma regra de índice no Firestore para esta query composta
+            const q = query(osRef, where("placa", "==", placa.toUpperCase()));
+            const snap = await getDocs(q);
+            return snap.docs.map(doc => doc.data());
+        } catch (error) {
+            console.error("Erro ao buscar histórico:", error);
+            throw error;
+        }
+    }
+
     async buscarVeiculoPorPlaca(placa) {
         try {
             const veiculosRef = collection(this.db, "veiculos");
@@ -397,10 +410,40 @@ class App {
         this.bd.buscarVeiculoPorPlaca("AQUECIMENTO").catch(() => {});
     }
 
+
+    
+    async lidarComConsulta() {
+        const placa = document.getElementById('buscaPlacaConsulta').value.trim().toUpperCase();
+        const container = document.getElementById('listaResultados');
+        
+        if (!placa) { alert("Digite a placa!"); return; }
+        container.innerHTML = "Buscando...";
+
+        try {
+            const historico = await this.bd.buscarHistorico(placa);
+            if (historico.length === 0) {
+                container.innerHTML = "Nenhum histórico encontrado.";
+            } else {
+                container.innerHTML = historico.map(os => `
+                    <div class="card mb-2">
+                        <div class="card-body p-2">
+                            <strong>Data:</strong> ${new Date(os.dataEntrada).toLocaleDateString()}<br>
+                            <strong>Serviço:</strong> ${os.descricao}<br>
+                            <strong>Total:</strong> R$ ${os.valorTotal}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            container.innerHTML = "Erro ao buscar histórico.";
+        }
+    }
+
     inicializarEventos() {
         document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
         document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
         document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
+        document.getElementById('btnConsultar').addEventListener('click', () => this.lidarComConsulta());
 
         // Mudança na MARCA
         this.ui.selectMarca.addEventListener("change", (e) => {

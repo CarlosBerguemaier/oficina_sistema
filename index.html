@@ -4,136 +4,151 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oficina - Ordens de Serviço</title>
-    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <style>
+        .max-w-custom { max-width: 600px; margin: 0 auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
 </head>
 <body class="bg-light">
 
 <div class="container py-4 max-w-custom">
-    <h2 class="text-center mb-4">Nova Ordem de Serviço</h2>
+    <!-- Menu de Navegação -->
+    <ul class="nav nav-pills nav-justified mb-4">
+        <li class="nav-item"><button class="nav-link active" onclick="mostrarTab('novaOS')">Nova OS</button></li>
+        <li class="nav-item"><button class="nav-link" onclick="mostrarTab('consultarOS')">Consultas</button></li>
+    </ul>
 
-    <!-- Seção 1: Busca pela Placa -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <label for="placaBusca" class="form-label fw-bold">Placa do Veículo</label>
-            <div class="input-group input-group-lg">
-                <input type="text" id="placaBusca" class="form-control text-uppercase" placeholder="ABC-1234" autocomplete="off">
-                <button class="btn btn-primary" id="btnBuscarPlaca" type="button">Buscar</button>
+    <!-- ABA NOVA OS -->
+    <div id="novaOS" class="tab-content active">
+        <h2 class="text-center mb-4">Nova Ordem de Serviço</h2>
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <label for="placaBusca" class="form-label fw-bold">Placa do Veículo</label>
+                <div class="input-group input-group-lg">
+                    <input type="text" id="placaBusca" class="form-control text-uppercase" placeholder="ABC-1234" autocomplete="off">
+                    <button class="btn btn-primary" id="btnBuscarPlaca" type="button">Buscar</button>
+                </div>
+                <div id="alertaBusca" class="mt-2"></div>
             </div>
-            <div id="alertaBusca" class="mt-2"></div>
         </div>
+
+        <form id="formOS" class="d-none">
+            <!-- Dados do Cliente e Veículo -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-secondary text-white">Dados do Cliente e Veículo</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-primary fw-bold">Nome do Cliente</label>
+                        <input type="text" id="nomeCliente" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 col-md-4 mb-3">
+                            <label class="form-label">Marca</label>
+                            <select id="marcaCarro" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                <option value="OUTRA">Outra marca...</option>
+                            </select>
+                            <input type="text" id="outraMarca" class="form-control mt-2 d-none" placeholder="Digite a marca">
+                        </div>
+                        <div class="col-12 col-md-4 mb-3">
+                            <label class="form-label">Modelo</label>
+                            <select id="modeloCarro" class="form-select" disabled required>
+                                <option value="">Aguardando marca...</option>
+                            </select>
+                            <input type="text" id="outroModelo" class="form-control mt-2 d-none" placeholder="Digite o modelo">
+                        </div>
+                        <div class="col-12 col-md-4 mb-3">
+                            <label class="form-label">Motor</label>
+                            <select id="litragemCarro" class="form-select" disabled required>
+                                <option value="">Aguardando modelo...</option>
+                            </select>
+                            <input type="text" id="outraLitragem" class="form-control mt-2 d-none" placeholder="Digite o motor">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Ano</label>
+                            <input type="number" id="anoCarro" class="form-control" placeholder="Ex: 2015" required>
+                        </div>
+                    </div>
+                    <div id="areaHistorico" class="d-none alert alert-info p-2 mt-2">
+                        <p class="mb-1 fw-bold">Cliente já possui histórico!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados do Serviço -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-secondary text-white">Detalhes do Serviço</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">KM Entrada</label>
+                            <input type="number" id="kmEntrada" class="form-control" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">KM Saída</label>
+                            <input type="number" id="kmSaida" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição do que foi feito</label>
+                        <textarea id="descricao" class="form-control" rows="3" required></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Faturamento -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-secondary text-white">Faturamento e Repasse</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Valor Cobrado (R$)</label>
+                        <input type="number" id="valorTotal" step="0.01" class="form-control form-control-lg text-success fw-bold" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label text-primary">Repasse Carlos</label>
+                            <input type="number" id="repasseCarlos" step="0.01" class="form-control" placeholder="0.00">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label text-primary">Repasse Ratinho</label>
+                            <input type="number" id="repasseRatinho" step="0.01" class="form-control" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mb-5">
+                <button type="button" id="btnCancelar" class="btn btn-outline-danger btn-lg w-50">Cancelar</button>
+                <button type="submit" class="btn btn-success btn-lg w-50">Salvar Ordem</button>
+            </div>
+        </form>
     </div>
 
-    <!-- Seção 2: Formulário da OS (Escondido até a busca) -->
-    <form id="formOS" class="d-none">
-        
-  <!-- Dados do Cliente e Carro -->
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-secondary text-white">Dados do Cliente e Veículo</div>
+    <!-- ABA CONSULTA -->
+    <div id="consultarOS" class="tab-content">
+        <h2 class="text-center mb-4">Consultar Histórico</h2>
+        <div class="card shadow-sm">
             <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label text-primary fw-bold">Nome do Cliente</label>
-                    <input type="text" id="nomeCliente" class="form-control" required>
-                </div>
-                
-                <div class="row">
-                    <!-- 1. Marca -->
-                    <div class="col-12 col-md-4 mb-3">
-                        <label class="form-label">Marca</label>
-                        <select id="marcaCarro" class="form-select" required>
-                            <option value="">Selecione...</option>
-                            <!-- Marcas injetadas pelo JS -->
-                            <option value="OUTRA">Outra marca...</option>
-                        </select>
-                        <input type="text" id="outraMarca" class="form-control mt-2 d-none" placeholder="Digite a marca">
-                    </div>
-                    
-                    <!-- 2. Modelo -->
-                    <div class="col-12 col-md-4 mb-3">
-                        <label class="form-label">Modelo</label>
-                        <select id="modeloCarro" class="form-select" disabled required>
-                            <option value="">Aguardando marca...</option>
-                        </select>
-                        <input type="text" id="outroModelo" class="form-control mt-2 d-none" placeholder="Digite o modelo">
-                    </div>
-
-                    <!-- 3. Motor (Litragem) -->
-                    <div class="col-12 col-md-4 mb-3">
-                        <label class="form-label">Motor</label>
-                        <select id="litragemCarro" class="form-select" disabled required>
-                            <option value="">Aguardando modelo...</option>
-                        </select>
-                        <input type="text" id="outraLitragem" class="form-control mt-2 d-none" placeholder="Digite o motor">
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label">Ano</label>
-                        <input type="number" id="anoCarro" class="form-control" placeholder="Ex: 2015" required>
-                    </div>
-                </div>
-
-                <!-- Histórico (Se for cliente antigo) -->
-                <div id="areaHistorico" class="d-none alert alert-info p-2 mt-2">
-                    <p class="mb-1 fw-bold">Cliente já possui histórico!</p>
-                    <button type="button" class="btn btn-sm btn-outline-info w-100 bg-white">Ver Ordens Anteriores</button>
-                </div>
+                <input type="text" id="buscaPlacaConsulta" class="form-control" placeholder="Digite a placa (ex: ABC-1234)">
+                <button class="btn btn-secondary w-100 mt-2" id="btnConsultar">Buscar Histórico</button>
+                <div id="listaResultados" class="mt-3"></div>
             </div>
         </div>
-
-        <!-- Dados do Serviço -->
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-secondary text-white">Detalhes do Serviço</div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label">KM Entrada</label>
-                        <input type="number" id="kmEntrada" class="form-control" required>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label">KM Saída</label>
-                        <input type="number" id="kmSaida" class="form-control">
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Descrição do que foi feito</label>
-                    <textarea id="descricao" class="form-control" rows="3" required></textarea>
-                </div>
-            </div>
-        </div>
-
-        <!-- Fechamento e Comissão -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-secondary text-white">Faturamento e Repasse</div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Valor Cobrado do Cliente (R$)</label>
-                    <input type="number" id="valorTotal" step="0.01" class="form-control form-control-lg text-success fw-bold" required>
-                </div>
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label text-primary">Repasse Carlos (R$)</label>
-                        <input type="number" id="repasseCarlos" step="0.01" class="form-control" placeholder="0.00">
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label text-primary">Repasse Ratinho (R$)</label>
-                        <input type="number" id="repasseRatinho" step="0.01" class="form-control" placeholder="0.00">
-                    </div>
-                </div>
-                <div class="form-text mt-0">Deixe zerado se não houver repasse para um dos dois. O restante do valor fica para a oficina.</div>
-            </div>
-        </div>
-
-        <!-- Botões de Ação -->
-        <div class="d-flex gap-2 mb-5">
-            <button type="button" id="btnCancelar" class="btn btn-outline-danger btn-lg w-50">Cancelar</button>
-            <button type="submit" class="btn btn-success btn-lg w-50">Salvar Ordem</button>
-        </div>
-    </form>
+    </div>
 </div>
 
+<script>
+    function mostrarTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.target.classList.add('active');
+    }
+</script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

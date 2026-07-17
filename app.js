@@ -144,39 +144,75 @@ class Interface {
         }
     }
 
-    mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
+   mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
         this.formOS.classList.remove("d-none");
         
         if (veiculoExiste) {
             this.alertaBusca.innerHTML = `<span class="text-success fw-bold">Veículo encontrado!</span>`;
             this.inputNome.value = dadosVeiculo.nomeCliente || ""; 
             
-            // Preenche os dados novos do veículo
+            // 1. Preenche a MARCA (Select)
             if (dadosVeiculo.marcaCarro) {
-                // Se a marca não estiver na lista padrão, marca como OUTRA e mostra o campo de texto
                 if (!frotaBrasil[dadosVeiculo.marcaCarro]) {
                     this.selectMarca.value = "OUTRA";
                     this.inputOutraMarca.classList.remove("d-none");
                     this.inputOutraMarca.value = dadosVeiculo.marcaCarro;
                 } else {
                     this.selectMarca.value = dadosVeiculo.marcaCarro;
-                    this.atualizarModelos(dadosVeiculo.marcaCarro);
+                    // Simula uma mudança para o sistema liberar a lista de modelos
+                    this.selectMarca.dispatchEvent(new Event("change"));
                 }
             }
             
-            this.inputModelo.value = dadosVeiculo.modeloCarro || "";
-            this.inputLitragem.value = dadosVeiculo.litragemCarro || "";
-            this.inputAno.value = dadosVeiculo.anoCarro || "";
+            // 2. Preenche o MODELO (Select)
+            if (dadosVeiculo.modeloCarro) {
+                if (this.selectMarca.value === "OUTRA" || !frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro]) {
+                    this.selectModelo.value = "OUTRO";
+                    this.inputOutroModelo.classList.remove("d-none");
+                    this.inputOutroModelo.value = dadosVeiculo.modeloCarro;
+                } else {
+                    this.selectModelo.value = dadosVeiculo.modeloCarro;
+                    // Simula uma mudança para o sistema liberar os motores
+                    this.selectModelo.dispatchEvent(new Event("change"));
+                }
+            }
+
+            // 3. Preenche a LITRAGEM (Select)
+            if (dadosVeiculo.litragemCarro) {
+                let motorNaLista = false;
+                if (frotaBrasil[dadosVeiculo.marcaCarro] && frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro]) {
+                    motorNaLista = frotaBrasil[dadosVeiculo.marcaCarro][dadosVeiculo.modeloCarro].includes(dadosVeiculo.litragemCarro);
+                }
+
+                if (!motorNaLista) {
+                    this.selectLitragem.value = "OUTRO";
+                    this.inputOutraLitragem.classList.remove("d-none");
+                    this.inputOutraLitragem.value = dadosVeiculo.litragemCarro;
+                } else {
+                    this.selectLitragem.value = dadosVeiculo.litragemCarro;
+                }
+            }
             
+            this.inputAno.value = dadosVeiculo.anoCarro || "";
             this.areaHistorico.classList.remove("d-none");
         } else {
+            // Se for a primeira vez do cliente
             this.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Preencha os dados.</span>`;
             this.inputNome.value = "";
             this.selectMarca.value = "";
             this.inputOutraMarca.value = "";
             this.inputOutraMarca.classList.add("d-none");
-            this.inputModelo.value = "";
-            this.inputLitragem.value = "";
+            
+            this.selectModelo.innerHTML = '<option value="">Aguardando marca...</option>';
+            this.selectModelo.disabled = true;
+            this.inputOutroModelo.value = "";
+            this.inputOutroModelo.classList.add("d-none");
+            
+            this.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
+            this.selectLitragem.disabled = true;
+            this.inputOutraLitragem.value = "";
+            this.inputOutraLitragem.classList.add("d-none");
+            
             this.inputAno.value = "";
             this.areaHistorico.classList.add("d-none");
         }
@@ -286,7 +322,7 @@ class App {
         });
     }
 
-    async lidarComBuscaPlaca() {
+ async lidarComBuscaPlaca() {
         const placa = this.ui.inputPlaca.value.trim();
         if (placa.length < 7) {
             alert("Digite uma placa válida.");
@@ -303,7 +339,11 @@ class App {
                 this.ui.mostrarFormulario(false);
             }
         } catch (error) {
-            alert("Erro de conexão ao buscar a placa.");
+            // Agora o erro exato vai aparecer no F12 para nós!
+            console.error("ERRO DETALHADO DO FIREBASE:", error);
+            alert("Erro de conexão com o banco de dados. Verifique o Console (F12).");
+            // Garante que o formulário NÃO abra se der erro
+            this.ui.formOS.classList.add("d-none"); 
         } finally {
             this.ui.mostrarCarregando(false);
         }

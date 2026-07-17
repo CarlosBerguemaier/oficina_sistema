@@ -60,6 +60,7 @@ class BancoDeDados {
 // 3. CAMADA DE INTERFACE (View)
 // ==========================================
 class Interface {
+   // Dentro do construtor da classe Interface:
     constructor() {
         this.formOS = document.getElementById("formOS");
         this.alertaBusca = document.getElementById("alertaBusca");
@@ -68,7 +69,68 @@ class Interface {
         // Inputs
         this.inputPlaca = document.getElementById("placaBusca");
         this.inputNome = document.getElementById("nomeCliente");
-        this.inputModelo = document.getElementById("modeloCarro");
+        
+        // Selects e Inputs Manuais
+        this.selectMarca = document.getElementById("marcaCarro");
+        this.inputOutraMarca = document.getElementById("outraMarca");
+        
+        this.selectModelo = document.getElementById("modeloCarro");
+        this.inputOutroModelo = document.getElementById("outroModelo");
+        
+        this.selectLitragem = document.getElementById("litragemCarro");
+        this.inputOutraLitragem = document.getElementById("outraLitragem");
+        
+        this.inputAno = document.getElementById("anoCarro");
+
+        this.carregarMarcas();
+    }
+
+    carregarMarcas() {
+        Object.keys(frotaBrasil).sort().forEach(marca => {
+            const option = document.createElement("option");
+            option.value = marca;
+            option.textContent = marca;
+            this.selectMarca.insertBefore(option, this.selectMarca.lastElementChild);
+        });
+    }
+
+    // Limpa o formulário e esconde os campos extras
+    limparFormulario() {
+        this.formOS.reset();
+        this.formOS.classList.add("d-none");
+        this.inputPlaca.value = "";
+        this.alertaBusca.innerHTML = "";
+        
+        this.inputOutraMarca.classList.add("d-none");
+        this.inputOutroModelo.classList.add("d-none");
+        this.inputOutraLitragem.classList.add("d-none");
+        
+        this.selectModelo.disabled = true;
+        this.selectModelo.innerHTML = '<option value="">Aguardando marca...</option>';
+        this.selectLitragem.disabled = true;
+        this.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
+    }
+
+    carregarMarcas() {
+        // Preenche o select de marcas dinamicamente usando a lista do topo do arquivo
+        Object.keys(frotaBrasil).sort().forEach(marca => {
+            const option = document.createElement("option");
+            option.value = marca;
+            option.textContent = marca;
+            // Insere antes da opção "OUTRA"
+            this.selectMarca.insertBefore(option, this.selectMarca.lastElementChild);
+        });
+    }
+
+    atualizarModelos(marca) {
+        this.datalistModelos.innerHTML = ""; // Limpa a lista atual
+        if (frotaBrasil[marca]) {
+            frotaBrasil[marca].sort().forEach(modelo => {
+                const option = document.createElement("option");
+                option.value = modelo;
+                this.datalistModelos.appendChild(option);
+            });
+        }
     }
 
     mostrarCarregando(buscando) {
@@ -87,13 +149,35 @@ class Interface {
         
         if (veiculoExiste) {
             this.alertaBusca.innerHTML = `<span class="text-success fw-bold">Veículo encontrado!</span>`;
-            this.inputNome.value = dadosVeiculo.nome_cliente; // Supondo que venha na query
-            this.inputModelo.value = dadosVeiculo.modelo;
+            this.inputNome.value = dadosVeiculo.nomeCliente || ""; 
+            
+            // Preenche os dados novos do veículo
+            if (dadosVeiculo.marcaCarro) {
+                // Se a marca não estiver na lista padrão, marca como OUTRA e mostra o campo de texto
+                if (!frotaBrasil[dadosVeiculo.marcaCarro]) {
+                    this.selectMarca.value = "OUTRA";
+                    this.inputOutraMarca.classList.remove("d-none");
+                    this.inputOutraMarca.value = dadosVeiculo.marcaCarro;
+                } else {
+                    this.selectMarca.value = dadosVeiculo.marcaCarro;
+                    this.atualizarModelos(dadosVeiculo.marcaCarro);
+                }
+            }
+            
+            this.inputModelo.value = dadosVeiculo.modeloCarro || "";
+            this.inputLitragem.value = dadosVeiculo.litragemCarro || "";
+            this.inputAno.value = dadosVeiculo.anoCarro || "";
+            
             this.areaHistorico.classList.remove("d-none");
         } else {
             this.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Preencha os dados.</span>`;
             this.inputNome.value = "";
+            this.selectMarca.value = "";
+            this.inputOutraMarca.value = "";
+            this.inputOutraMarca.classList.add("d-none");
             this.inputModelo.value = "";
+            this.inputLitragem.value = "";
+            this.inputAno.value = "";
             this.areaHistorico.classList.add("d-none");
         }
     }
@@ -103,6 +187,7 @@ class Interface {
         this.formOS.classList.add("d-none");
         this.inputPlaca.value = "";
         this.alertaBusca.innerHTML = "";
+        this.inputOutraMarca.classList.add("d-none");
     }
 }
 
@@ -117,12 +202,88 @@ class App {
         this.inicializarEventos();
     }
 
-    inicializarEventos() {
-        // Evento: Botão de buscar placa
+   inicializarEventos() {
         document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
-        
-        // Evento: Submeter o formulário principal
         document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
+        document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
+
+        // GATILHO 1: Quando escolhe a MARCA
+        this.ui.selectMarca.addEventListener("change", (e) => {
+            const marca = e.target.value;
+            this.ui.selectModelo.innerHTML = '<option value="">Selecione o modelo...</option>';
+            this.ui.selectLitragem.innerHTML = '<option value="">Aguardando modelo...</option>';
+            this.ui.selectLitragem.disabled = true;
+            
+            // Esconde tudo de manuais pra resetar a tela
+            this.ui.inputOutraMarca.classList.add("d-none");
+            this.ui.inputOutroModelo.classList.add("d-none");
+            this.ui.inputOutraLitragem.classList.add("d-none");
+
+            if (marca === "OUTRA") {
+                this.ui.inputOutraMarca.classList.remove("d-none");
+                this.ui.selectModelo.disabled = true;
+                this.ui.inputOutroModelo.classList.remove("d-none"); // Pede o modelo manual
+                this.ui.selectLitragem.disabled = true;
+                this.ui.inputOutraLitragem.classList.remove("d-none"); // Pede a litragem manual
+            } else if (marca !== "") {
+                this.ui.selectModelo.disabled = false;
+                // Preenche os modelos dessa marca
+                Object.keys(frotaBrasil[marca]).sort().forEach(modelo => {
+                    const opt = document.createElement("option");
+                    opt.value = modelo;
+                    opt.textContent = modelo;
+                    this.ui.selectModelo.appendChild(opt);
+                });
+                // Opção manual para modelos não mapeados
+                const optOutro = document.createElement("option");
+                optOutro.value = "OUTRO";
+                optOutro.textContent = "Outro modelo...";
+                this.ui.selectModelo.appendChild(optOutro);
+            } else {
+                this.ui.selectModelo.disabled = true;
+            }
+        });
+
+        // GATILHO 2: Quando escolhe o MODELO
+        this.ui.selectModelo.addEventListener("change", (e) => {
+            const modelo = e.target.value;
+            const marcaSelecionada = this.ui.selectMarca.value;
+            this.ui.selectLitragem.innerHTML = '<option value="">Selecione o motor...</option>';
+            
+            this.ui.inputOutroModelo.classList.add("d-none");
+            this.ui.inputOutraLitragem.classList.add("d-none");
+
+            if (modelo === "OUTRO") {
+                this.ui.inputOutroModelo.classList.remove("d-none");
+                this.ui.selectLitragem.disabled = true;
+                this.ui.inputOutraLitragem.classList.remove("d-none");
+            } else if (modelo !== "") {
+                this.ui.selectLitragem.disabled = false;
+                // Puxa as litragens exatas daquele modelo
+                const motores = frotaBrasil[marcaSelecionada][modelo];
+                motores.forEach(motor => {
+                    const opt = document.createElement("option");
+                    opt.value = motor;
+                    opt.textContent = motor;
+                    this.ui.selectLitragem.appendChild(opt);
+                });
+                const optOutro = document.createElement("option");
+                optOutro.value = "OUTRO";
+                optOutro.textContent = "Outro motor...";
+                this.ui.selectLitragem.appendChild(optOutro);
+            } else {
+                this.ui.selectLitragem.disabled = true;
+            }
+        });
+
+        // GATILHO 3: Quando escolhe a LITRAGEM
+        this.ui.selectLitragem.addEventListener("change", (e) => {
+            if (e.target.value === "OUTRO") {
+                this.ui.inputOutraLitragem.classList.remove("d-none");
+            } else {
+                this.ui.inputOutraLitragem.classList.add("d-none");
+            }
+        });
     }
 
     async lidarComBuscaPlaca() {
@@ -148,18 +309,29 @@ class App {
         }
     }
 
-    async lidarComSalvamento(evento) {
-     // Pega os valores digitados. Se estiver vazio, considera como 0 (zero).
+   async lidarComSalvamento(evento) {
+        evento.preventDefault();
+
+        // 1. As três linhas entram aqui! Elas extraem o valor final (da lista ou digitado)
+        let marcaFinal = this.ui.selectMarca.value === "OUTRA" ? this.ui.inputOutraMarca.value.trim().toUpperCase() : this.ui.selectMarca.value;
+        let modeloFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO") ? this.ui.inputOutroModelo.value.trim().toUpperCase() : this.ui.selectModelo.value;
+        let litragemFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO" || this.ui.selectLitragem.value === "OUTRO") ? this.ui.inputOutraLitragem.value.trim().toUpperCase() : this.ui.selectLitragem.value;
+
+        // 2. Pega os valores financeiros
         const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
         const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
         const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
 
+        // 3. Monta o pacote de dados com as variáveis "Final" que criamos acima
         const dadosNovaOS = {
             placa: this.ui.inputPlaca.value.toUpperCase(),
             nomeCliente: document.getElementById("nomeCliente").value,
-            modeloCarro: document.getElementById("modeloCarro").value,
-            kmEntrada: document.getElementById("kmEntrada").value,
-            kmSaida: document.getElementById("kmSaida").value,
+            marcaCarro: marcaFinal,
+            modeloCarro: modeloFinal,
+            litragemCarro: litragemFinal,
+            anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
+            kmEntrada: parseInt(document.getElementById("kmEntrada").value) || 0,
+            kmSaida: parseInt(document.getElementById("kmSaida").value) || 0,
             descricao: document.getElementById("descricao").value,
             valorTotal: valorTotal,
             comissao: {
@@ -168,8 +340,263 @@ class App {
             },
             dataEntrada: new Date().toISOString()
         };
-    }
-}
 
+        // 4. Envia para o Firebase
+        try {
+            await this.bd.salvarNovaOS(dadosNovaOS);
+            alert("Ordem de serviço salva com sucesso!");
+            this.ui.limparFormulario();
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao salvar os dados.");
+        }
+    }
+
+    inicializarEventos() {
+        document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
+        document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
+        
+        // Evento: Botão de Cancelar
+        document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
+
+        // Evento: Quando o usuário muda a marca no select
+        document.getElementById("marcaCarro").addEventListener("change", (e) => {
+            const marca = e.target.value;
+            if (marca === "OUTRA") {
+                this.ui.inputOutraMarca.classList.remove("d-none");
+                this.ui.inputOutraMarca.required = true;
+                this.ui.datalistModelos.innerHTML = ""; // Deixa os modelos vazios
+            } else {
+                this.ui.inputOutraMarca.classList.add("d-none");
+                this.ui.inputOutraMarca.required = false;
+                this.ui.atualizarModelos(marca);
+            }
+        });
+    }
+
+    async lidarComSalvamento(evento) {
+        evento.preventDefault();
+
+        // Verifica qual marca foi selecionada (a da lista ou a digitada manualmente)
+        let marcaFinal = document.getElementById("marcaCarro").value;
+        if (marcaFinal === "OUTRA") {
+            marcaFinal = document.getElementById("outraMarca").value.trim().toUpperCase();
+        }
+
+        const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
+        const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
+        const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
+
+        const dadosNovaOS = {
+            placa: this.ui.inputPlaca.value.toUpperCase(),
+            nomeCliente: document.getElementById("nomeCliente").value,
+            marcaCarro: marcaFinal,
+            modeloCarro: document.getElementById("modeloCarro").value.toUpperCase(),
+            litragemCarro: document.getElementById("litragemCarro").value,
+            anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
+            kmEntrada: parseInt(document.getElementById("kmEntrada").value) || 0,
+            kmSaida: parseInt(document.getElementById("kmSaida").value) || 0,
+            descricao: document.getElementById("descricao").value,
+            valorTotal: valorTotal,
+            comissao: {
+                carlos: repasseCarlos,
+                ratinho: repasseRatinho
+            },
+            dataEntrada: new Date().toISOString()
+        };
+
+        try {
+            await this.bd.salvarNovaOS(dadosNovaOS);
+            alert("Ordem de serviço salva com sucesso!");
+            this.ui.limparFormulario();
+        } catch (error) {
+            alert("Erro ao salvar os dados.");
+        }
+    }
+
+    
+
+    
+}
+// ==========================================
+// MEGA BANCO DE DADOS LOCAL (Anos 80, 90, 00, 10 e 20)
+// ==========================================
+const frotaBrasil = {
+    "Chevrolet": {
+        "Chevette": ["1.4", "1.6", "1.6 S"],
+        "Opala / Caravan": ["2.5 (4 cil)", "4.1 (6 cil)"],
+        "Monza": ["1.6", "1.8", "2.0"],
+        "Kadett / Ipanema": ["1.8", "2.0", "2.0 GSi"],
+        "Omega / Suprema": ["2.0", "2.2", "3.0 V6", "3.8 V6", "4.1 6 cil"],
+        "Vectra": ["2.0", "2.0 16v", "2.2", "2.2 16v", "2.4 16v"],
+        "Astra": ["1.8", "2.0", "2.0 16v"],
+        "Zafira": ["2.0", "2.0 16v"],
+        "Corsa / Corsa Classic": ["1.0", "1.0 16v", "1.4", "1.6", "1.6 16v", "1.8"],
+        "Celta": ["1.0", "1.4"],
+        "Prisma": ["1.0", "1.4"],
+        "Onix": ["1.0", "1.0 Turbo", "1.4"],
+        "Onix Plus": ["1.0", "1.0 Turbo"],
+        "Cobalt": ["1.4", "1.8"],
+        "Spin": ["1.8"],
+        "Agile": ["1.4"],
+        "Meriva": ["1.4", "1.8", "1.8 16v"],
+        "Cruze": ["1.4 Turbo", "1.8"],
+        "Montana": ["1.2 Turbo", "1.4", "1.8"],
+        "Tracker": ["1.0 Turbo", "1.2 Turbo", "1.4 Turbo", "1.8", "2.0"],
+        "S10": ["2.2", "2.4", "2.5", "2.8 Diesel", "4.3 V6"],
+        "Blazer / Trailblazer": ["2.2", "2.4", "2.8 Diesel", "4.3 V6"],
+        "Silverado / D20": ["4.1 6 cil", "4.2 Diesel", "Maxion Diesel"],
+        "Equinox": ["1.5 Turbo", "2.0 Turbo"]
+    },
+    "Fiat": {
+        "147 / Panorama / Oggi": ["1.05", "1.3"],
+        "Uno / Mille": ["1.0", "1.3", "1.4", "1.5", "1.6", "1.6R", "1.4 Turbo"],
+        "Premio / Elba": ["1.3", "1.5", "1.6"],
+        "Fiorino": ["1.0", "1.3", "1.4", "1.5", "1.6"],
+        "Tempra": ["2.0", "2.0 16v", "2.0 Turbo"],
+        "Tipo": ["1.6", "2.0", "2.0 16v"],
+        "Marea / Marea Weekend": ["1.6", "1.8", "2.0 20v", "2.0 20v Turbo", "2.4 20v"],
+        "Brava": ["1.6", "1.8"],
+        "Stilo": ["1.8", "1.8 16v", "2.4 20v"],
+        "Bravo": ["1.4 Turbo", "1.8 16v"],
+        "Palio / Palio Weekend": ["1.0", "1.0 16v", "1.3 16v", "1.4", "1.5", "1.6", "1.6 16v", "1.8"],
+        "Siena / Grand Siena": ["1.0", "1.4", "1.5", "1.6", "1.6 16v", "1.8"],
+        "Strada": ["1.3", "1.4", "1.5", "1.6", "1.6 16v", "1.8"],
+        "Punto": ["1.4", "1.4 Turbo", "1.6", "1.8"],
+        "Linea": ["1.4 Turbo", "1.8", "1.9"],
+        "Idea": ["1.4", "1.6", "1.8"],
+        "Doblo": ["1.3", "1.4", "1.6", "1.8"],
+        "Mobi": ["1.0"],
+        "Argo": ["1.0", "1.3", "1.8"],
+        "Cronos": ["1.0", "1.3", "1.8"],
+        "Pulse": ["1.0 Turbo", "1.3"],
+        "Fastback": ["1.0 Turbo", "1.3 Turbo"],
+        "Toro": ["1.3 Turbo", "1.8", "2.0 Diesel", "2.4"],
+        "Ducato": ["2.3 Diesel", "2.8 Diesel", "2.8 Turbo Diesel"]
+    },
+    "Volkswagen": {
+        "Fusca / Brasilia / Variant": ["1.3 (Ar)", "1.5 (Ar)", "1.6 (Ar)"],
+        "Kombi": ["1.4 (Flex)", "1.5 (Ar)", "1.6 (Ar)", "1.6 Diesel"],
+        "Passat (Antigo)": ["1.5", "1.6", "1.8"],
+        "Gol": ["1.0", "1.0 16v", "1.0 16v Turbo", "1.6", "1.8", "2.0", "2.0 16v"],
+        "Voyage": ["1.0", "1.5", "1.6", "1.8"],
+        "Parati": ["1.0 16v", "1.0 16v Turbo", "1.5", "1.6", "1.8", "2.0", "2.0 16v"],
+        "Saveiro": ["1.6", "1.8", "2.0"],
+        "Santana / Quantum": ["1.8", "2.0"],
+        "Apollo / Logus / Pointer": ["1.8", "2.0"],
+        "Polo / Polo Classic": ["1.0", "1.0 Turbo", "1.4 Turbo", "1.6", "1.8", "2.0"],
+        "Golf": ["1.0 TSI", "1.4 TSI", "1.6", "1.8", "1.8 Turbo", "2.0", "2.8 VR6"],
+        "Bora / Jetta": ["1.4 Turbo", "2.0", "2.0 Turbo", "2.5"],
+        "Passat (Importado) / Variant": ["1.8 Turbo", "2.0", "2.0 Turbo", "2.8 V6", "3.2 V6"],
+        "Fox / CrossFox / SpaceFox": ["1.0", "1.6"],
+        "Up!": ["1.0", "1.0 TSI (Turbo)"],
+        "Virtus": ["1.0 Turbo", "1.4 Turbo", "1.6"],
+        "Nivus": ["1.0 Turbo"],
+        "T-Cross": ["1.0 Turbo", "1.4 Turbo"],
+        "Taos": ["1.4 Turbo"],
+        "Tiguan": ["1.4 Turbo", "2.0 Turbo"],
+        "Touareg": ["3.2 V6", "3.6 V6", "4.2 V8"],
+        "Amarok": ["2.0 Diesel", "3.0 V6 Diesel"]
+    },
+    "Ford": {
+        "Corcel / Belina / Del Rey": ["1.4", "1.6", "1.8"],
+        "Escort / Verona": ["1.6", "1.8", "1.8 16v", "2.0"],
+        "Versailles / Royale": ["1.8", "2.0"],
+        "Pampa": ["1.6", "1.8"],
+        "Ka": ["1.0", "1.3", "1.5", "1.6", "1.0 3cil"],
+        "Fiesta": ["1.0", "1.0 Supercharger", "1.3", "1.4 16v", "1.5", "1.6"],
+        "Focus": ["1.6", "1.8 16v", "2.0 16v"],
+        "Mondeo": ["1.8", "2.0", "2.5 V6"],
+        "Fusion": ["2.0 Turbo", "2.3", "2.5", "3.0 V6"],
+        "EcoSport": ["1.0 Supercharger", "1.5", "1.6", "2.0"],
+        "Edge": ["3.5 V6"],
+        "Territory": ["1.5 Turbo"],
+        "Bronco Sport": ["2.0 Turbo"],
+        "Ranger": ["2.2 Diesel", "2.3", "2.5", "3.0 Diesel", "3.2 Diesel", "4.0 V6"],
+        "F-1000": ["3.6 6 cil", "3.9 Diesel", "4.3 Diesel", "4.9i 6 cil"],
+        "F-250": ["3.9 Diesel", "4.2 V6", "4.2 Diesel"]
+    },
+    "Hyundai": {
+        "HB20 / HB20S / HB20X": ["1.0", "1.0 Turbo", "1.6"],
+        "Creta": ["1.0 Turbo", "1.6", "2.0"],
+        "Tucson": ["1.6 Turbo", "2.0", "2.7 V6"],
+        "ix35": ["2.0"],
+        "Santa Fe / Vera Cruz": ["2.4", "2.7 V6", "3.3 V6", "3.5 V6", "3.8 V6"],
+        "i30 / i30 CW": ["1.6", "1.8", "2.0"],
+        "Elantra": ["1.8", "2.0"],
+        "Sonata": ["2.4"],
+        "Azera": ["3.0 V6", "3.3 V6"],
+        "Veloster": ["1.6"],
+        "HR": ["2.5 Diesel"]
+    },
+    "Toyota": {
+        "Bandeirante": ["3.7 Diesel", "3.8 Diesel", "4.0 Diesel"],
+        "Corolla / Fielder": ["1.6", "1.8", "1.8 Híbrido", "2.0"],
+        "Corolla Cross": ["1.8 Híbrido", "2.0"],
+        "Etios": ["1.3", "1.5"],
+        "Yaris": ["1.3", "1.5"],
+        "Camry": ["2.2", "2.4", "3.0 V6", "3.5 V6"],
+        "RAV4": ["2.0", "2.4", "2.5 Híbrido"],
+        "Hilux": ["2.4 Diesel", "2.5 Diesel", "2.7", "2.8 Diesel", "3.0 Diesel"],
+        "SW4": ["2.7", "2.8 Diesel", "3.0 Diesel", "4.0 V6"]
+    },
+    "Honda": {
+        "Civic": ["1.5 Turbo", "1.6", "1.7", "1.8", "2.0", "2.0 Turbo (Type R)"],
+        "Fit": ["1.4", "1.5"],
+        "City": ["1.5"],
+        "HR-V": ["1.5", "1.5 Turbo", "1.8"],
+        "CR-V": ["1.5 Turbo", "2.0", "2.4"],
+        "WR-V": ["1.5"],
+        "Accord": ["2.0", "2.0 Turbo", "2.4", "3.0 V6", "3.5 V6"]
+    },
+    "Renault": {
+        "Clio": ["1.0", "1.0 16v", "1.6", "1.6 16v"],
+        "Twingo": ["1.0", "1.2"],
+        "Logan / Sandero": ["1.0", "1.0 16v", "1.6", "1.6 16v", "2.0"],
+        "Kwid": ["1.0"],
+        "Megane / Scenic": ["1.6", "2.0", "2.0 16v"],
+        "Fluence": ["2.0", "2.0 Turbo"],
+        "Duster / Oroch": ["1.3 Turbo", "1.6", "2.0"],
+        "Captur": ["1.3 Turbo", "1.6", "2.0"],
+        "Kangoo": ["1.0", "1.6"],
+        "Master / Trafic": ["2.0", "2.2", "2.3 Diesel", "2.5 Diesel"]
+    },
+    "Peugeot": {
+        "206 / 207 / Hoggar": ["1.0", "1.4", "1.6", "1.6 16v"],
+        "208": ["1.0", "1.0 Turbo", "1.2", "1.5", "1.6"],
+        "307 / 308": ["1.6", "1.6 THP (Turbo)", "2.0"],
+        "408": ["1.6 THP (Turbo)", "2.0"],
+        "2008 / 3008 / 5008": ["1.6", "1.6 THP (Turbo)"],
+        "Partner / Boxer": ["1.6", "1.8", "2.3 Diesel", "2.8 Diesel"]
+    },
+    "Citroën": {
+        "C3": ["1.0", "1.2", "1.4", "1.5", "1.6"],
+        "C4 / Pallas / Lounge": ["1.6 THP (Turbo)", "2.0"],
+        "C4 Cactus / Aircross": ["1.5", "1.6", "1.6 THP (Turbo)"],
+        "Xsara / Xsara Picasso": ["1.6", "2.0"],
+        "Berlingo / Jumper": ["1.6", "1.8", "2.3 Diesel", "2.8 Diesel"]
+    },
+    "Jeep": {
+        "Willys / Rural": ["2.6 6 cil", "3.0 6 cil"],
+        "Renegade": ["1.3 Turbo", "1.8", "2.0 Diesel"],
+        "Compass": ["1.3 Turbo", "2.0", "2.0 Diesel"],
+        "Commander": ["1.3 Turbo", "2.0 Diesel"],
+        "Cherokee / Grand Cherokee": ["3.0 V6 Diesel", "3.2 V6", "3.6 V6", "3.7 V6", "4.0 6 cil", "4.7 V8", "5.2 V8"]
+    },
+    "Nissan": {
+        "March / Versa": ["1.0", "1.6"],
+        "Kicks": ["1.6"],
+        "Sentra": ["2.0"],
+        "Tiida / Livina": ["1.8"],
+        "Frontier / Xterra": ["2.3 Diesel", "2.5 Diesel", "2.8 Diesel"],
+        "Pathfinder": ["3.3 V6", "4.0 V6"]
+    },
+    "Mitsubishi": {
+        "Lancer": ["2.0", "2.0 Turbo (Evo)"],
+        "ASX / Outlander": ["2.0", "2.2 Diesel", "3.0 V6"],
+        "Pajero (TR4 / Dakar / Full)": ["2.0", "2.4 Diesel", "3.2 Diesel", "3.5 V6", "3.8 V6"],
+        "L200 (Triton / Savana)": ["2.4 Diesel", "2.5 Diesel", "3.2 Diesel", "3.5 V6"]
+    }
+};
 // Inicia a aplicação
 const oficinaApp = new App();

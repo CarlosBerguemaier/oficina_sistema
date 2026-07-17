@@ -28,20 +28,47 @@
     <!-- Seção 2: Formulário da OS (Escondido até a busca) -->
     <form id="formOS" class="d-none">
         
-        <!-- Dados do Cliente e Carro -->
+     <!-- Dados do Cliente e Carro -->
         <div class="card shadow-sm mb-3">
-            <div class="card-header bg-secondary text-white">Dados do Cliente</div>
+            <div class="card-header bg-secondary text-white">Dados do Cliente e Veículo</div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label">Nome do Cliente</label>
+                    <label class="form-label text-primary fw-bold">Nome do Cliente</label>
                     <input type="text" id="nomeCliente" class="form-control" required>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Modelo do Carro</label>
-                    <input type="text" id="modeloCarro" class="form-control" required>
+                
+                <div class="row">
+                    <div class="col-12 col-md-6 mb-3">
+                        <label class="form-label">Marca</label>
+                        <select id="marcaCarro" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <!-- As opções serão injetadas pelo JavaScript -->
+                            <option value="OUTRA">Outra (Digitar manualmente)</option>
+                        </select>
+                        <input type="text" id="outraMarca" class="form-control mt-2 d-none" placeholder="Qual é a marca?">
+                    </div>
+                    
+                    <div class="col-12 col-md-6 mb-3">
+                        <label class="form-label">Modelo</label>
+                        <!-- O atributo "list" conecta este input ao datalist abaixo -->
+                        <input type="text" id="modeloCarro" class="form-control" list="listaModelos" autocomplete="off" placeholder="Ex: Onix, Gol..." required>
+                        <datalist id="listaModelos"></datalist>
+                    </div>
                 </div>
+
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Motor (Litragem)</label>
+                        <input type="text" id="litragemCarro" class="form-control" placeholder="Ex: 1.0, 1.4, 2.0" required>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Ano</label>
+                        <input type="number" id="anoCarro" class="form-control" placeholder="Ex: 2015" required>
+                    </div>
+                </div>
+
                 <!-- Histórico (Se for cliente antigo) -->
-                <div id="areaHistorico" class="d-none alert alert-info p-2">
+                <div id="areaHistorico" class="d-none alert alert-info p-2 mt-2">
                     <p class="mb-1 fw-bold">Cliente já possui histórico!</p>
                     <button type="button" class="btn btn-sm btn-outline-info w-100 bg-white">Ver Ordens Anteriores</button>
                 </div>
@@ -91,7 +118,10 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-success btn-lg w-100 mb-5">Salvar Ordem de Serviço</button>
+     <div class="d-flex gap-2 mb-5">
+            <button type="button" id="btnCancelar" class="btn btn-outline-danger btn-lg w-50">Cancelar</button>
+            <button type="submit" class="btn btn-success btn-lg w-50">Salvar Ordem</button>
+        </div>
     </form>
 </div>
 

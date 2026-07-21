@@ -325,8 +325,20 @@ class Interface {
         this.inputOutraLitragem = document.getElementById("outraLitragem");
         
         this.inputAno = document.getElementById("anoCarro");
+        this.setarDataAtual();
 
         this.carregarMarcas();
+    }
+
+setarDataAtual() {
+        const hoje = new Date();
+        const ano = hoje.getFullYear();
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const campoData = document.getElementById("dataOS");
+        if(campoData) {
+            campoData.value = `${ano}-${mes}-${dia}`;
+        }
     }
 
     carregarMarcas() {
@@ -348,6 +360,8 @@ class Interface {
             btn.disabled = false;
         }
     }
+
+    
 
     mostrarFormulario(veiculoExiste, dadosVeiculo = null) {
         this.formOS.classList.remove("d-none");
@@ -425,7 +439,7 @@ class Interface {
         this.formOS.classList.add("d-none");
         this.inputPlaca.value = "";
         this.alertaBusca.innerHTML = "";
-        
+        this.setarDataAtual();
         this.inputOutraMarca.classList.add("d-none");
         this.inputOutroModelo.classList.add("d-none");
         this.inputOutraLitragem.classList.add("d-none");
@@ -624,8 +638,7 @@ class App {
         const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
         const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
 
-        // GERA A DATA NO FORMATO YYYY-MM-DD PARA FACILITAR O FILTRO
-        const dataAtualString = new Date().toISOString().split('T')[0];
+        const dataSelecionada = document.getElementById("dataOS").value;
 
       // Coleta os repasses extras gerados dinamicamente
         const outrosRepasses = [];
@@ -638,7 +651,7 @@ class App {
         });
 
         const dadosNovaOS = {
-            data: dataAtualString,
+            data: dataSelecionada,
             placa: this.ui.inputPlaca.value.toUpperCase(),
             nomeCliente: document.getElementById("nomeCliente").value,
             marcaCarro: marcaFinal,
@@ -919,6 +932,7 @@ abrirModalDetalhes(id) {
         this.ui.mostrarFormulario(true, os); // Reutiliza a lógica para preencher veículo
         
         // Preenche os dados específicos da OS
+        document.getElementById("dataOS").value = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : ''); // <-- ADICIONE ESTA LINHA AQUI
         document.getElementById("kmEntrada").value = os.kmEntrada || '';
         document.getElementById("kmSaida").value = os.kmSaida || '';
         document.getElementById("descricao").value = os.descricao || '';

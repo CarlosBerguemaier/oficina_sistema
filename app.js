@@ -466,7 +466,8 @@ class App {
         this.itensPorPagina = 10;
         this.osEmEdicaoId = null; // Guarda o ID da OS sendo editada
         this.osSelecionadaParaModal = null; // Guarda os dados da OS aberta no modal
-        
+        this.dadosFinanceirosAtuais = { oficina: [], carlos: [], ratinho: [], gastos: [] };
+        this.totaisFinanceiros = { oficina: 0, carlos: 0, ratinho: 0, gastos: 0 };
         
         this.inicializarEventosConsulta();
         
@@ -705,9 +706,67 @@ class App {
     inicializarEventosConsulta() {
         const btnNova = document.getElementById("btnAbaNovaOS");
         const btnConsulta = document.getElementById("btnAbaConsulta");
+        const btnFinanceiro = document.getElementById("btnAbaFinanceiro");
         const containerNova = document.getElementById("containerNovaOS");
         const containerConsulta = document.getElementById("containerConsultaOS");
+        const containerFinanceiro = document.getElementById("containerFinanceiro");
         const titulo = document.getElementById("tituloPagina");
+
+        const resetarBotoes = () => {
+            [btnNova, btnConsulta, btnFinanceiro].forEach(btn => btn.classList.replace("btn-primary", "btn-outline-primary"));
+            [containerNova, containerConsulta, containerFinanceiro].forEach(cont => cont.classList.add("d-none"));
+        };
+
+        // Alternar para tela de Nova OS
+        btnNova.addEventListener("click", () => {
+            resetarBotoes();
+            containerNova.classList.remove("d-none");
+            btnNova.classList.replace("btn-outline-primary", "btn-primary");
+            titulo.textContent = "Nova Ordem de Serviço";
+        });
+
+        // Alternar para tela de Consulta
+        btnConsulta.addEventListener("click", () => {
+            resetarBotoes();
+            containerConsulta.classList.remove("d-none");
+            btnConsulta.classList.replace("btn-outline-primary", "btn-primary");
+            titulo.textContent = "Consultar Ordens de Serviço";
+            this.carregarDadosIniciaisConsulta();
+        });
+
+        // Alternar para tela Financeira
+        btnFinanceiro.addEventListener("click", async () => {
+            resetarBotoes();
+            containerFinanceiro.classList.remove("d-none");
+            btnFinanceiro.classList.replace("btn-outline-primary", "btn-primary");
+            titulo.textContent = "Resumo Financeiro";
+            
+            // Seta o mês atual no filtro se estiver vazio
+            const filtroMes = document.getElementById("filtroMesFinanceiro");
+            if (!filtroMes.value) {
+                const hoje = new Date();
+                const ano = hoje.getFullYear();
+                const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+                filtroMes.value = `${ano}-${mes}`;
+            }
+            await this.processarFinanceiro(filtroMes.value);
+        });
+
+        // Evento de mudança de mês no financeiro
+        document.getElementById("filtroMesFinanceiro").addEventListener("change", (e) => {
+            this.processarFinanceiro(e.target.value);
+        });
+
+        // Eventos dos botões do Financeiro (Expandir e WhatsApp)
+        document.querySelectorAll(".btn-expandir-fin").forEach(btn => {
+            btn.addEventListener("click", (e) => this.abrirModalFinanceiro(e.target.dataset.tipo));
+        });
+        document.querySelectorAll(".btn-whats-fin").forEach(btn => {
+            btn.addEventListener("click", (e) => this.exportarWhats(e.target.dataset.tipo));
+        });
+        document.getElementById("btnWhatsGeral").addEventListener("click", () => this.exportarWhats("geral"));
+
+        // ... MANTENHA O RESTANTE DOS EVENTOS DE CONSULTA (btnAplicarFiltros, etc) ABAIXO DESTA LINHA ...
 
         // Alternar para tela de Nova OS
         btnNova.addEventListener("click", () => {
@@ -1020,7 +1079,132 @@ abrirModalDetalhes(id) {
             }
         }
     }
-    
+
+    async processarFinanceiro(anoMes) {
+        // Busca as OS atualizadas
+        this.todasAsOS = await this.bd.buscarUltimasOS();
+        
+        // Zera os dados
+        this.dadosFinanceirosAtuais = { oficina: [], carlos: [], ratinho: [], gastos: [] };
+        this.totaisFinanceiros = { oficina: 0, carlos: 0, ratinho: 0, gastos: 0 };
+
+        // Filtra as OS pelo mês selecionado (formato YYYY-MM)
+        const osDoMes = this.todasAsOS.filter(os => {
+            const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : '');
+            return dataBase.startsWith(anoMes);
+        });
+
+        osDoMes.forEach(os => {
+            const valorTotal = os.valorTotal || 0;
+            const comissaoCarlos = os.comissao?.carlos || 0;
+            const comissaoRatinho = os.comissao?.ratinho || 0;
+            
+            // Calcula gastos extras (Peças, Retífica)
+            const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
+            
+            // O líquido da oficina é o valor cobrado menos as comissões e menos os gastos de peças
+            const valorLiquidoOficina = valorTotal - comissaoCarlos - comissaoRatinho - gastosOS;
+
+            // Formatação de data para exibição
+            const dataParts = (os.data || os.dataEntrada.split('T')[0]).split('-');
+            const dataStr = `${dataParts[2]}/${dataParts[1]}`;
+            const descricaoVeiculo = `${os.marcaCarro} ${os.modeloCarro} (${os.placa})`;
+
+            // Registra ganhos da Oficina
+            if (valorLiquidoOficina > 0) {
+                this.dadosFinanceirosAtuais.oficina.push({ data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, valor: valorLiquidoOficina, id: os.id });
+                this.totaisFinanceiros.oficina += valorLiquidoOficina;
+            }
+
+            // Registra ganhos do Carlos
+            if (comissaoCarlos > 0) {
+                this.dadosFinanceirosAtuais.carlos.push({ data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, valor: comissaoCarlos, id: os.id });
+                this.totaisFinanceiros.carlos += comissaoCarlos;
+            }
+
+            // Registra ganhos do Ratinho
+            if (comissaoRatinho > 0) {
+                this.dadosFinanceirosAtuais.ratinho.push({ data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, valor: comissaoRatinho, id: os.id });
+                this.totaisFinanceiros.ratinho += comissaoRatinho;
+            }
+
+            // Registra as despesas
+            if (gastosOS > 0) {
+                this.dadosFinanceirosAtuais.gastos.push({ veiculo: descricaoVeiculo, valor: gastosOS, desc: os.outrosRepasses.map(r => r.descricao).join(", ") });
+                this.totaisFinanceiros.gastos += gastosOS;
+            }
+        });
+
+        // Atualiza a tela
+        document.getElementById("totalOficina").textContent = `R$ ${this.totaisFinanceiros.oficina.toFixed(2).replace('.', ',')}`;
+        document.getElementById("totalCarlos").textContent = `R$ ${this.totaisFinanceiros.carlos.toFixed(2).replace('.', ',')}`;
+        document.getElementById("totalRatinho").textContent = `R$ ${this.totaisFinanceiros.ratinho.toFixed(2).replace('.', ',')}`;
+    }
+
+    abrirModalFinanceiro(tipo) {
+        const titulos = { oficina: "Detalhes: Caixa da Oficina (Líquido)", carlos: "Detalhes: Serviços Carlos", ratinho: "Detalhes: Serviços Ratinho" };
+        document.getElementById("tituloModalFinanceiro").textContent = titulos[tipo];
+        
+        const tbody = document.getElementById("tabelaFinanceiroBody");
+        tbody.innerHTML = "";
+        
+        const lista = this.dadosFinanceirosAtuais[tipo];
+        
+        if (lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum serviço registrado neste mês.</td></tr>';
+        } else {
+            lista.forEach(item => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.data}</td>
+                        <td>${item.veiculo}</td>
+                        <td>${item.cliente}</td>
+                        <td class="text-success fw-bold">R$ ${item.valor.toFixed(2).replace('.', ',')}</td>
+                    </tr>
+                `;
+            });
+        }
+        
+        document.getElementById("totalModalFinanceiro").textContent = `Total: R$ ${this.totaisFinanceiros[tipo].toFixed(2).replace('.', ',')}`;
+        
+        const modal = new bootstrap.Modal(document.getElementById("modalDetalhesFinanceiro"));
+        modal.show();
+    }
+
+    exportarWhats(tipo) {
+        const mesRef = document.getElementById("filtroMesFinanceiro").value.split('-').reverse().join('/');
+        let texto = "";
+
+        if (tipo === "geral") {
+            const faturamentoBruto = this.totaisFinanceiros.oficina + this.totaisFinanceiros.carlos + this.totaisFinanceiros.ratinho + this.totaisFinanceiros.gastos;
+            texto = `*FECHAMENTO GERAL - OFICINA* \n*Mês de Referência:* ${mesRef}\n\n`;
+            texto += `*Resumo Financeiro:*\n`;
+            texto += `[+] Faturamento Bruto: R$ ${faturamentoBruto.toFixed(2)}\n`;
+            texto += `[=] Oficina (Caixa Líquido): R$ ${this.totaisFinanceiros.oficina.toFixed(2)}\n`;
+            texto += `[-] Repasses Carlos: R$ ${this.totaisFinanceiros.carlos.toFixed(2)}\n`;
+            texto += `[-] Repasses Ratinho: R$ ${this.totaisFinanceiros.ratinho.toFixed(2)}\n`;
+            texto += `[!] Gastos Extras (Peças/Etc): R$ ${this.totaisFinanceiros.gastos.toFixed(2)}\n\n`;
+            
+            texto += `*DETALHES - CAIXA DA OFICINA:*\n`;
+            this.dadosFinanceirosAtuais.oficina.forEach(i => texto += `• ${i.data} | ${i.veiculo} - R$ ${i.valor.toFixed(2)}\n`);
+            
+            if (this.dadosFinanceirosAtuais.gastos.length > 0) {
+                texto += `\n*DETALHES - GASTOS EXTRAS:*\n`;
+                this.dadosFinanceirosAtuais.gastos.forEach(g => texto += `• ${g.veiculo} (${g.desc}) - R$ ${g.valor.toFixed(2)}\n`);
+            }
+        } else {
+            const nomes = { oficina: "CAIXA DA OFICINA", carlos: "CARLOS", ratinho: "RATINHO" };
+            texto = `*RESUMO DE GANHOS - ${nomes[tipo]}* \n*Mês de Referência:* ${mesRef}\n\n`;
+            this.dadosFinanceirosAtuais[tipo].forEach(item => {
+                texto += `${item.data} - ${item.veiculo}\n Cliente: ${item.cliente}\n Valor: R$ ${item.valor.toFixed(2)}\n\n`;
+            });
+            texto += `*VALOR TOTAL A RECEBER: R$ ${this.totaisFinanceiros[tipo].toFixed(2)}*`;
+        }
+
+        const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+        window.open(url, '_blank');
+    }
+
 
 }
 

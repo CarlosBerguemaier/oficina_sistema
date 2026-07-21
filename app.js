@@ -599,6 +599,20 @@ class App {
             }
         });
 
+// Formatar Quilometragem automaticamente (adicionar pontos)
+        const inputKm = document.getElementById("quilometragem");
+        inputKm.addEventListener("input", (e) => {
+            // Remove tudo que não for número
+            let valor = e.target.value.replace(/\D/g, ""); 
+            if (valor !== "") {
+                // Formata no padrão brasileiro (ex: 200.560)
+                e.target.value = parseInt(valor, 10).toLocaleString('pt-BR');
+            } else {
+                e.target.value = "";
+            }
+        });
+
+
     }
 
     async lidarComBuscaPlaca() {
@@ -649,17 +663,16 @@ class App {
                 outrosRepasses.push({ descricao: desc, valor: valor });
             }
         });
-
-        const dadosNovaOS = {
-            data: dataSelecionada,
+    const stringKmFormatada = document.getElementById("quilometragem").value.replace(/\D/g, "");
+    const dadosNovaOS = {
+            data: dataSelecionada, 
             placa: this.ui.inputPlaca.value.toUpperCase(),
             nomeCliente: document.getElementById("nomeCliente").value,
             marcaCarro: marcaFinal,
             modeloCarro: modeloFinal,
             litragemCarro: litragemFinal,
             anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
-            kmEntrada: parseInt(document.getElementById("kmEntrada").value) || 0,
-            kmSaida: parseInt(document.getElementById("kmSaida").value) || 0,
+            quilometragem: parseInt(stringKmFormatada) || 0,
             descricao: document.getElementById("descricao").value,
             valorTotal: valorTotal,
             comissao: {
@@ -754,10 +767,26 @@ class App {
         document.getElementById("btnExcluirOS").addEventListener("click", () => this.confirmarExclusaoOS());
     }
 
-    async carregarDadosIniciaisConsulta() {
+   async carregarDadosIniciaisConsulta() {
         document.getElementById("tabelaOSBody").innerHTML = '<tr><td colspan="5" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Carregando informações...</td></tr>';
         try {
             this.todasAsOS = await this.bd.buscarUltimasOS();
+            
+            // NOVA LÓGICA DE ORDENAÇÃO: Força a lista inteira a se organizar pela data da OS escolhida
+            this.todasAsOS.sort((a, b) => {
+                const dataA = a.data || (a.dataEntrada ? a.dataEntrada.split('T')[0] : '0000-00-00');
+                const dataB = b.data || (b.dataEntrada ? b.dataEntrada.split('T')[0] : '0000-00-00');
+                
+                // Se as datas do serviço forem iguais, desempata pela hora exata de salvamento
+                if (dataA === dataB) {
+                    const horaA = a.dataEntrada || '0000';
+                    const horaB = b.dataEntrada || '0000';
+                    return horaB.localeCompare(horaA);
+                }
+                // Ordena de forma decrescente (Maior/Mais nova sempre no topo)
+                return dataB.localeCompare(dataA); 
+            });
+
             this.osFiltradas = [...this.todasAsOS]; // Começa mostrando todas
             this.paginaAtual = 1;
             this.renderizarTabelaOS();
@@ -791,7 +820,7 @@ class App {
         this.renderizarTabelaOS();
     }
 
-renderizarTabelaOS() {
+   renderizarTabelaOS() {
         const tbody = document.getElementById("tabelaOSBody");
         tbody.innerHTML = "";
 
@@ -807,30 +836,35 @@ renderizarTabelaOS() {
         const fim = inicio + this.itensPorPagina;
         const osPaginadas = this.osFiltradas.slice(inicio, fim);
 
-        // Agrupa as OS por data
+        // Agrupa as OS por data no formato YYYY-MM-DD para o JavaScript não perder a ordem matemática
         const gruposPorData = {};
         osPaginadas.forEach(os => {
-            const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : 'Sem Data');
+            const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : '0000-00-00');
+            
+            if (!gruposPorData[dataBase]) gruposPorData[dataBase] = [];
+            gruposPorData[dataBase].push(os);
+        });
+
+        // Garante que a renderização na tela siga estritamente a ordem decrescente das datas agrupadas
+        const datasOrdenadas = Object.keys(gruposPorData).sort((a, b) => b.localeCompare(a));
+
+        // Renderiza separando por blocos de data
+        datasOrdenadas.forEach(dataBase => {
+            // Formata para exibição padrão brasileiro DD/MM/YYYY
             let dataExibicao = "Sem Data";
-            if (dataBase !== 'Sem Data') {
+            if (dataBase !== '0000-00-00') {
                 const partes = dataBase.split('-');
                 if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
             }
-            
-            if (!gruposPorData[dataExibicao]) gruposPorData[dataExibicao] = [];
-            gruposPorData[dataExibicao].push(os);
-        });
 
-        // Renderiza separando por blocos de data
-        for (const [data, ordens] of Object.entries(gruposPorData)) {
             // Linha de Cabeçalho da Data
             const trData = document.createElement("tr");
             trData.className = "table-secondary";
-            trData.innerHTML = `<td colspan="5" class="fw-bold text-center text-dark">📅 ${data}</td>`;
+            trData.innerHTML = `<td colspan="5" class="fw-bold text-center text-dark">📅 ${dataExibicao}</td>`;
             tbody.appendChild(trData);
 
             // Linhas das OS
-            ordens.forEach(os => {
+            gruposPorData[dataBase].forEach(os => {
                 const tr = document.createElement("tr");
                 
                 // Encurta a descrição para não quebrar o layout
@@ -848,7 +882,7 @@ renderizarTabelaOS() {
                 `;
                 tbody.appendChild(tr);
             });
-        }
+        });
 
         const maxPaginas = Math.ceil(this.osFiltradas.length / this.itensPorPagina);
         document.getElementById("textoPaginacao").textContent = `Página ${this.paginaAtual} de ${maxPaginas || 1}`;
@@ -880,15 +914,17 @@ abrirModalDetalhes(id) {
 
         // Insira ${repassesExtrasHTML} na sua string literal (conteudo) logo após os repasses fixos.
 
-
+        let kmValor = os.quilometragem || os.kmEntrada || '';
+        let kmFormatado = kmValor ? parseInt(kmValor).toLocaleString('pt-BR') + ' km' : '-';
+        
         const conteudo = `
             <div class="row">
                 <div class="col-md-6 mb-3"><strong>Placa:</strong> ${os.placa || '-'}</div>
                 <div class="col-md-6 mb-3"><strong>Cliente:</strong> ${os.nomeCliente || '-'}</div>
                 <div class="col-md-6 mb-3"><strong>Veículo:</strong> ${os.marcaCarro} ${os.modeloCarro} (${os.litragemCarro})</div>
                 <div class="col-md-6 mb-3"><strong>Ano:</strong> ${os.anoCarro || '-'}</div>
-                <div class="col-md-6 mb-3"><strong>Data da Entrada:</strong> ${dataExibicao}</div>
-                <div class="col-md-6 mb-3"><strong>KM Entrada:</strong> ${os.kmEntrada || '-'} | <strong>KM Saída:</strong> ${os.kmSaida || '-'}</div>
+                <div class="col-md-6 mb-3"><strong>Data da OS:</strong> ${dataExibicao}</div>
+                <div class="col-md-6 mb-3"><strong>Quilometragem:</strong> ${kmFormatado}</div>
             </div>
             <hr>
             <div class="mb-3">
@@ -932,9 +968,9 @@ abrirModalDetalhes(id) {
         this.ui.mostrarFormulario(true, os); // Reutiliza a lógica para preencher veículo
         
         // Preenche os dados específicos da OS
-        document.getElementById("dataOS").value = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : ''); // <-- ADICIONE ESTA LINHA AQUI
-        document.getElementById("kmEntrada").value = os.kmEntrada || '';
-        document.getElementById("kmSaida").value = os.kmSaida || '';
+        document.getElementById("dataOS").value = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : ''); // <-- ADICIONE ESTA LINHA 
+        let kmOriginal = os.quilometragem || os.kmEntrada || '';
+        document.getElementById("quilometragem").value = kmOriginal ? parseInt(kmOriginal).toLocaleString('pt-BR') : '';
         document.getElementById("descricao").value = os.descricao || '';
         document.getElementById("valorTotal").value = os.valorTotal || '';
         document.getElementById("repasseCarlos").value = os.comissao?.carlos || '';

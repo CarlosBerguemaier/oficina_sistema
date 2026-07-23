@@ -824,6 +824,7 @@ class App {
         // Ações do Modal
         document.getElementById("btnEditarOS").addEventListener("click", () => this.prepararEdicaoOS());
         document.getElementById("btnExcluirOS").addEventListener("click", () => this.confirmarExclusaoOS());
+        document.getElementById("btnImprimirOS").addEventListener("click", () => this.imprimirReciboOS());
     }
 
    async carregarDadosIniciaisConsulta() {
@@ -1203,6 +1204,84 @@ abrirModalDetalhes(id) {
 
         const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
         window.open(url, '_blank');
+    }
+
+
+imprimirReciboOS() {
+        const os = this.osSelecionadaParaModal;
+        if (!os) return;
+
+        // Formatação da Data
+        let dataExibicao = "N/A";
+        const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : null);
+        if (dataBase) {
+            const partes = dataBase.split('-');
+            if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+
+        // Formatação do KM
+        let kmValor = os.quilometragem || os.kmEntrada || '';
+        let kmFormatado = kmValor ? parseInt(kmValor).toLocaleString('pt-BR') + ' km' : '-';
+
+        // Formatação dos Gastos Extras / Peças
+        let repassesExtrasHTML = '';
+        if (os.outrosRepasses && os.outrosRepasses.length > 0) {
+            repassesExtrasHTML = '<br><strong>PEÇAS E OUTROS:</strong><br>';
+            os.outrosRepasses.forEach(rep => {
+                repassesExtrasHTML += `<div style="display: flex; justify-content: space-between;"><span>${rep.descricao}</span> <span>R$ ${(rep.valor || 0).toFixed(2).replace('.', ',')}</span></div>`;
+            });
+        }
+
+        // Estrutura do Recibo (Estilo Cupom)
+        const reciboHTML = `
+            <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
+                <h2 style="margin: 0; font-weight: bold; text-transform: uppercase;">Oficina do Evandro</h2>
+                <p style="margin: 5px 0 0 0; font-size: 16px;">São Francisco de Assis - RS</p>
+                <p style="margin: 5px 0 0 0; font-size: 14px;">Documento Auxiliar de Prestação de Serviço</p>
+                <p style="margin: 0; font-size: 12px;">(Sem Valor Fiscal)</p>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                <strong>OS Nº: ${os.id.substring(0, 8).toUpperCase()}</strong>
+                <strong>DATA: ${dataExibicao}</strong>
+            </div>
+            
+            <div style="border-bottom: 1px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
+                <strong>CLIENTE:</strong> ${os.nomeCliente || '-'}<br>
+                <strong>VEÍCULO:</strong> ${os.marcaCarro} ${os.modeloCarro} (${os.litragemCarro})<br>
+                <strong>PLACA:</strong> ${os.placa || '-'} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>ANO:</strong> ${os.anoCarro || '-'}<br>
+                <strong>QUILOMETRAGEM:</strong> ${kmFormatado}
+            </div>
+
+            <div style="border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
+                <strong>MÃO DE OBRA / SERVIÇOS EXECUTADOS:</strong><br>
+                <div style="white-space: pre-wrap; margin-top: 8px;">${os.descricao || 'Sem descrição.'}</div>
+                ${repassesExtrasHTML}
+            </div>
+
+            <div style="text-align: right; font-size: 22px; margin-bottom: 40px;">
+                <strong>TOTAL GERAL: R$ ${(os.valorTotal || 0).toFixed(2).replace('.', ',')}</strong>
+            </div>
+
+            <div style="text-align: center; margin-top: 80px;">
+                <p style="margin: 0;">____________________________________________________</p>
+                <p style="margin: 5px 0 0 0;">Assinatura do Cliente / Recebedor</p>
+                <p style="margin-top: 20px; font-size: 12px; font-style: italic;">Agradecemos a preferência!</p>
+            </div>
+        `;
+
+        // Injeta o HTML na div invisível
+        const containerRecibo = document.getElementById("reciboImpressao");
+        containerRecibo.innerHTML = reciboHTML;
+        
+        // Remove as classes de "esconder" apenas durante a execução do script
+        containerRecibo.classList.remove("d-none");
+        
+        // Chama a janela de impressão nativa do navegador/celular
+        window.print();
+        
+        // Esconde a div novamente após a tela de impressão fechar
+        containerRecibo.classList.add("d-none");
     }
 
 

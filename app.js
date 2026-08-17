@@ -614,6 +614,28 @@ class App {
         });
 
 
+// Calcula o Grande Total automaticamente
+        const atualizarGrandeTotal = () => {
+            const maoDeObra = parseFloat(document.getElementById("valorMaoDeObra").value) || 0;
+            let gastos = 0;
+            document.querySelectorAll(".repasse-valor").forEach(input => {
+                gastos += parseFloat(input.value) || 0;
+            });
+            const total = maoDeObra + gastos;
+            document.getElementById("valorGrandeTotal").value = total.toFixed(2);
+        };
+
+        // Escuta digitação na Mão de Obra
+        document.getElementById("valorMaoDeObra").addEventListener("input", atualizarGrandeTotal);
+        
+        // Escuta digitação nos Gastos/Peças
+        document.getElementById("containerOutrosRepasses").addEventListener("input", (e) => {
+            if (e.target.classList.contains("repasse-valor")) {
+                atualizarGrandeTotal();
+            }
+        });
+
+
     }
 
     async lidarComBuscaPlaca() {
@@ -651,7 +673,8 @@ class App {
 
         const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
         const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
-        const valorTotal = parseFloat(document.getElementById("valorTotal").value) || 0;
+        const maoDeObra = parseFloat(document.getElementById("valorMaoDeObra").value) || 0;
+        const valorTotalFinal = parseFloat(document.getElementById("valorGrandeTotal").value) || 0;
 
         const dataSelecionada = document.getElementById("dataOS").value;
 
@@ -675,7 +698,8 @@ class App {
             anoCarro: parseInt(document.getElementById("anoCarro").value) || 0,
             quilometragem: parseInt(stringKmFormatada) || 0,
             descricao: document.getElementById("descricao").value,
-            valorTotal: valorTotal,
+            valorMaoDeObra: maoDeObra,
+            valorTotal: valorTotalFinal,
             comissao: {
                 carlos: repasseCarlos,
                 ratinho: repasseRatinho
@@ -1032,7 +1056,16 @@ abrirModalDetalhes(id) {
         let kmOriginal = os.quilometragem || os.kmEntrada || '';
         document.getElementById("quilometragem").value = kmOriginal ? parseInt(kmOriginal).toLocaleString('pt-BR') : '';
         document.getElementById("descricao").value = os.descricao || '';
-        document.getElementById("valorTotal").value = os.valorTotal || '';
+    // Cálculo retroativo: se a OS for antiga e não tiver Mão de Obra salva, ele deduz subtraindo as peças do valor total
+        const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
+        const maoDeObraEdit = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((os.valorTotal || 0) - gastosOS);
+        
+        document.getElementById("valorMaoDeObra").value = maoDeObraEdit;
+        
+        // Dispara o cálculo para preencher o Grande Total na tela
+        setTimeout(() => {
+            document.getElementById("valorMaoDeObra").dispatchEvent(new Event("input"));
+        }, 100);
         document.getElementById("repasseCarlos").value = os.comissao?.carlos || '';
         document.getElementById("repasseRatinho").value = os.comissao?.ratinho || '';
 
@@ -1103,9 +1136,11 @@ abrirModalDetalhes(id) {
             // Calcula gastos extras (Peças, Retífica)
             const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
             
-            // O líquido da oficina é o valor cobrado menos as comissões e menos os gastos de peças
-            const valorLiquidoOficina = valorTotal - comissaoCarlos - comissaoRatinho - gastosOS;
 
+          // O líquido da oficina é a Mão de Obra menos as comissões
+            // (Fazemos um fallback para não quebrar OS antigas)
+            const maoDeObra = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((valorTotal || 0) - gastosOS);
+            const valorLiquidoOficina = maoDeObra - comissaoCarlos - comissaoRatinho;
             // Formatação de data para exibição
             const dataParts = (os.data || os.dataEntrada.split('T')[0]).split('-');
             const dataStr = `${dataParts[2]}/${dataParts[1]}`;

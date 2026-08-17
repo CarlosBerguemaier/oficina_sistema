@@ -136,9 +136,9 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-secondary text-white">Faturamento e Repasse</div>
             <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Valor Cobrado do Cliente (R$)</label>
-                    <input type="number" id="valorTotal" step="0.01" class="form-control form-control-lg text-success fw-bold" required>
+              <div class="mb-3">
+                    <label class="form-label fw-bold text-primary">Valor da Mão de Obra (R$)</label>
+                    <input type="number" id="valorMaoDeObra" step="0.01" class="form-control form-control-lg fw-bold" required>
                 </div>
                 <div class="row">
                     <div class="col-6 mb-3">
@@ -164,6 +164,11 @@
                 <div class="form-text mt-3">Os campos acima são opcionais. Ao digitar a descrição de um gasto, uma nova linha vazia aparecerá automaticamente abaixo.</div>
                 </div>
                 <div class="form-text mt-0">Deixe zerado se não houver repasse para um dos dois. O restante do valor fica para a oficina.</div>
+            <hr class="mt-4 mb-3 border-2 border-dark">
+                <div class="bg-light p-3 rounded border text-end">
+                    <label class="form-label fw-bold text-success fs-5 mb-1">TOTAL A COBRAR DO CLIENTE (R$)</label>
+                    <input type="number" id="valorGrandeTotal" class="form-control form-control-lg text-success fw-bold text-end" readonly placeholder="R$ 0.00">
+                </div>
             </div>
         </div>
 

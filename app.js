@@ -1114,6 +1114,12 @@ abrirModalDetalhes(id) {
         }
     }
 
+
+
+
+
+    
+
     async processarFinanceiro(anoMes) {
         // Busca as OS atualizadas
         this.todasAsOS = await this.bd.buscarUltimasOS();

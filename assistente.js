@@ -151,19 +151,21 @@ export class Assistente {
     pedirChave() {
         const atual = this.obterChave();
         const final = atual ? `\n\nChave salva agora: termina em ...${atual.slice(-4)}` : "\n\nNenhuma chave salva ainda.";
-        const chave = prompt(
+        const colada = prompt(
             "Cole aqui a sua chave da API da Anthropic (começa com sk-ant-).\nEla fica salva só neste aparelho." + final,
             ""
         );
         // Cancelou ou deixou em branco: mantém a chave atual
-        if (chave === null || chave.trim() === "") return atual;
+        if (colada === null || colada.trim() === "") return atual;
+        // Tira espaços e quebras de linha que o celular às vezes coloca ao copiar
+        const chave = colada.replace(/\s+/g, "");
         try {
-            localStorage.setItem(CHAVE_STORAGE, chave.trim());
+            localStorage.setItem(CHAVE_STORAGE, chave);
         } catch {
             alert("Não foi possível salvar a chave neste navegador.");
         }
-        this.testarChave(chave.trim());
-        return chave.trim();
+        this.testarChave(chave);
+        return chave;
     }
 
     // Faz um pedido que não gasta crédito (lista os modelos) para conferir a chave
@@ -176,7 +178,8 @@ export class Assistente {
             this.mostrarStatus(`✅ Chave funcionando (termina em ...${chave.slice(-4)}).`, "success");
         } catch (erro) {
             console.error(erro);
-            this.mostrarStatus(`❌ A chave (termina em ...${chave.slice(-4)}) foi recusada. Erro ${erro.status ?? ""}: ${erro.message}`, "danger");
+            const resumo = `${chave.slice(0, 14)}...${chave.slice(-4)}, ${chave.length} caracteres`;
+            this.mostrarStatus(`❌ A chave (${resumo}) foi recusada. Erro ${erro.status ?? ""}: ${erro.message}`, "danger");
         }
     }
 

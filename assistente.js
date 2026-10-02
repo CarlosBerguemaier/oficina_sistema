@@ -99,6 +99,24 @@ function redimensionarImagem(arquivo, ladoMaximo = 1568) {
     });
 }
 
+// Junta o texto da resposta e tira a lista de OS dela.
+// Aceita JSON puro ou JSON com texto/```json em volta. Devolve null se não achar.
+function lerOrdensDaResposta(resposta) {
+    const texto = resposta.content
+        .filter(b => b.type === "text")
+        .map(b => b.text)
+        .join("");
+    const inicio = texto.indexOf("{");
+    const fim = texto.lastIndexOf("}");
+    if (inicio === -1 || fim <= inicio) return null;
+    try {
+        const dados = JSON.parse(texto.slice(inicio, fim + 1));
+        return Array.isArray(dados.ordens) ? dados.ordens : null;
+    } catch {
+        return null;
+    }
+}
+
 export class Assistente {
     constructor(frotaBrasil, aoExtrairOrdens) {
         this.frotaBrasil = frotaBrasil;
@@ -302,8 +320,13 @@ export class Assistente {
                 return null;
             }
 
-            const blocoTexto = resposta.content.find(b => b.type === "text");
-            const { ordens } = JSON.parse(blocoTexto.text);
+            const ordens = lerOrdensDaResposta(resposta);
+            if (!ordens) {
+                console.error("Resposta da IA não reconhecida:", resposta);
+                const blocos = resposta.content.map(b => b.type).join(", ") || "nenhum";
+                this.mostrarStatus(`Não entendi a resposta da IA (parada: ${resposta.stop_reason}; blocos: ${blocos}). Tente de novo e, se repetir, me mande esta mensagem.`, "danger");
+                return null;
+            }
 
             if (ordens.length === 0) {
                 this.mostrarStatus("Nenhuma OS encontrada. Tente falar ou fotografar de novo.", "warning");
@@ -324,7 +347,7 @@ export class Assistente {
             } else if (erro instanceof Anthropic.APIError) {
                 this.mostrarStatus(`Erro na IA (${erro.status ?? "sem conexão"}). Tente de novo.`, "danger");
             } else {
-                this.mostrarStatus("Erro ao ler a resposta da IA. Tente de novo.", "danger");
+                this.mostrarStatus(`Erro inesperado: ${erro?.message || erro}. Se repetir, me mande esta mensagem.`, "danger");
             }
             return null;
         }

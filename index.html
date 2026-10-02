@@ -3,24 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Oficina do Evandro · Ordens de Serviço</title>
+    <title>Parafusa · Gestão de Oficina</title>
+    <meta name="description" content="Parafusa: ordens de serviço, financeiro e equipe da sua oficina mecânica.">
 
     <!-- Fonte, Bootstrap e Ícones -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
 
-    <!-- Configurações para Tela Inicial de Celular -->
-    <link rel="icon" type="image/png" href="logo.png">
-    <link rel="apple-touch-icon" href="logo.png">
+    <!-- Ícones e tela inicial do celular -->
+    <link rel="icon" type="image/svg+xml" href="icone.svg">
+    <link rel="apple-touch-icon" href="icone-180.png">
     <meta name="theme-color" content="#0E3A66">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Parafusa">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
-<body>
+<body class="sem-sessao">
+
+<!-- ==========================================
+     TELA DE ACESSO (login, cadastro, oficina, convite)
+     ========================================== -->
+<div id="telaAcesso" class="acesso">
+    <div class="acesso-card">
+        <div class="acesso-marca">
+            <img src="icone.svg" alt="" width="56" height="56">
+            <span class="acesso-nome">Parafusa</span>
+            <span class="acesso-slogan">Sua oficina no lugar</span>
+        </div>
+
+        <div data-etapa="carregando" class="text-center py-4">
+            <span class="spinner-border text-secondary"></span>
+        </div>
+
+        <form data-etapa="login" id="formLogin" class="d-none">
+            <h1 class="acesso-titulo">Entrar</h1>
+            <label for="loginEmail" class="form-label">E-mail</label>
+            <input type="email" id="loginEmail" class="form-control mb-3" autocomplete="email" required>
+            <label for="loginSenha" class="form-label">Senha</label>
+            <input type="password" id="loginSenha" class="form-control mb-2" autocomplete="current-password" required>
+            <div class="text-end mb-3"><a href="#" data-ir="recuperar" class="acesso-link">Esqueci minha senha</a></div>
+            <button type="submit" class="btn btn-primary btn-lg w-100">Entrar</button>
+            <p class="acesso-rodape">Ainda não tem conta? <a href="#" data-ir="cadastro" class="acesso-link">Criar conta</a></p>
+        </form>
+
+        <form data-etapa="cadastro" id="formCadastro" class="d-none">
+            <h1 class="acesso-titulo">Criar conta</h1>
+            <label for="cadastroNome" class="form-label">Seu nome</label>
+            <input type="text" id="cadastroNome" class="form-control mb-3" autocomplete="name" required>
+            <label for="cadastroEmail" class="form-label">E-mail</label>
+            <input type="email" id="cadastroEmail" class="form-control mb-3" autocomplete="email" required>
+            <label for="cadastroSenha" class="form-label">Senha</label>
+            <input type="password" id="cadastroSenha" class="form-control mb-1" autocomplete="new-password" minlength="6" required>
+            <p class="form-text mb-3">Pelo menos 6 caracteres.</p>
+            <button type="submit" class="btn btn-primary btn-lg w-100">Criar conta</button>
+            <p class="acesso-rodape">Já tem conta? <a href="#" data-ir="login" class="acesso-link">Entrar</a></p>
+        </form>
+
+        <form data-etapa="recuperar" id="formRecuperar" class="d-none">
+            <h1 class="acesso-titulo">Recuperar senha</h1>
+            <p class="acesso-texto">Digite o e-mail da sua conta e enviaremos um link para criar uma senha nova.</p>
+            <label for="recuperarEmail" class="form-label">E-mail</label>
+            <input type="email" id="recuperarEmail" class="form-control mb-3" autocomplete="email" required>
+            <button type="submit" class="btn btn-primary btn-lg w-100">Enviar link</button>
+            <p class="acesso-rodape"><a href="#" data-ir="login" class="acesso-link">Voltar para o login</a></p>
+        </form>
+
+        <form data-etapa="oficina" id="formCriarOficina" class="d-none">
+            <h1 class="acesso-titulo" id="saudacaoNovaOficina">Olá!</h1>
+            <p class="acesso-texto">Qual é o nome da sua oficina? Você poderá mudar depois.</p>
+            <label for="nomeOficinaNova" class="form-label">Nome da oficina</label>
+            <input type="text" id="nomeOficinaNova" class="form-control mb-3" maxlength="60" placeholder="Ex: Oficina do Evandro" required>
+            <button type="submit" class="btn btn-primary btn-lg w-100">Criar minha oficina</button>
+            <p class="acesso-rodape">
+                <a href="#" data-ir="confirmar" class="acesso-link">Fui convidado por uma oficina</a>
+                <span class="mx-2 text-secondary">·</span>
+                <a href="#" data-ir="sair" class="acesso-link">Sair</a>
+            </p>
+        </form>
+
+        <div data-etapa="convite" class="d-none">
+            <h1 class="acesso-titulo">Você foi convidado</h1>
+            <p class="acesso-texto">Você recebeu um convite para entrar na oficina <strong id="nomeOficinaConvite"></strong>.</p>
+            <button type="button" id="btnAceitarConvite" class="btn btn-primary btn-lg w-100">Entrar na oficina</button>
+            <p class="acesso-rodape">
+                <a href="#" data-ir="oficina" class="acesso-link">Prefiro criar minha própria oficina</a>
+            </p>
+        </div>
+
+        <div data-etapa="confirmar" class="d-none">
+            <h1 class="acesso-titulo">Confirme seu e-mail</h1>
+            <p class="acesso-texto">Para entrar numa oficina como convidado, confirme o e-mail <strong id="emailConfirmacao"></strong>. Enviamos um link quando você criou a conta (veja também o spam).</p>
+            <button type="button" id="btnJaConfirmei" class="btn btn-primary btn-lg w-100 mb-2">Já confirmei</button>
+            <button type="button" id="btnReenviarConfirmacao" class="btn btn-light w-100">Reenviar o link</button>
+            <p class="acesso-rodape"><a href="#" data-ir="oficina" class="acesso-link">Voltar</a></p>
+        </div>
+
+        <div id="acessoMensagem" class="acesso-msg" role="alert"></div>
+    </div>
+</div>
 
 <!-- ==========================================
      CABEÇALHO
@@ -28,14 +112,14 @@
 <header class="app-header">
     <div class="app-header-inner">
         <div class="brand">
-            <img src="logo.png" alt="" class="brand-logo">
+            <img src="icone.svg" alt="" class="brand-logo">
             <div class="brand-text">
-                <span class="brand-name">Oficina do Evandro</span>
-                <span class="brand-sub">Gestão de ordens de serviço</span>
+                <span class="brand-name">Parafusa</span>
+                <span class="brand-sub" id="nomeOficinaHeader"></span>
             </div>
         </div>
-        <button type="button" id="btnConfigIA" class="btn-icon" title="Configurar chave da IA" aria-label="Configurar chave da IA">
-            <i class="bi bi-gear"></i>
+        <button type="button" id="btnConta" class="btn-icon" title="Conta e configurações" aria-label="Conta e configurações" data-bs-toggle="modal" data-bs-target="#modalConta">
+            <i class="bi bi-person-circle"></i>
         </button>
     </div>
 </header>
@@ -70,6 +154,17 @@
          TELA: NOVA OS
          ========================================== -->
     <section id="containerNovaOS">
+
+        <!-- Importação do sistema antigo (aparece só uma vez, para o dono) -->
+        <div id="avisoDadosAntigos" class="d-none callout callout-info">
+            <i class="bi bi-box-arrow-in-down callout-icon"></i>
+            <div class="callout-body">
+                <div class="fw-semibold">Encontramos os dados do sistema antigo</div>
+                <div class="small mt-1">Copie as ordens de serviço, veículos e funcionários para a sua oficina. É feito uma única vez.</div>
+                <button type="button" id="btnImportarAntigos" class="btn btn-primary btn-sm mt-2">Importar dados</button>
+                <div id="progressoImportacao" class="small mt-2"></div>
+            </div>
+        </div>
 
         <!-- Preencher com IA -->
         <div class="panel panel-ai">
@@ -455,6 +550,57 @@
     </div>
 </div>
 
+<!-- ==========================================
+     MODAL: CONTA E CONFIGURAÇÕES
+     ========================================== -->
+<div class="modal fade" id="modalConta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Conta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="conta-usuario">
+                    <i class="bi bi-person-circle"></i>
+                    <div>
+                        <strong id="contaEmail"></strong>
+                        <span id="contaPapel"></span>
+                    </div>
+                </div>
+
+                <div class="subsection-label">Oficina</div>
+                <form id="formNomeOficina" class="mb-4">
+                    <label for="inputNomeOficina" class="form-label">Nome</label>
+                    <input type="text" id="inputNomeOficina" class="form-control mb-2" maxlength="60" required>
+                    <label for="inputCidadeOficina" class="form-label">Cidade (aparece no recibo)</label>
+                    <input type="text" id="inputCidadeOficina" class="form-control mb-2" maxlength="60" placeholder="Ex: São Francisco de Assis - RS">
+                    <button type="submit" id="btnSalvarNomeOficina" class="btn btn-light">Salvar dados da oficina</button>
+                </form>
+
+                <div class="subsection-label">Quem tem acesso ao sistema</div>
+                <div id="listaAcessos" class="acesso-lista mb-2"></div>
+                <form id="formConvite" class="mb-4">
+                    <div class="d-flex gap-2">
+                        <input type="email" id="emailConvite" class="form-control" placeholder="E-mail da pessoa" required aria-label="E-mail para convidar">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-envelope-plus"></i> Convidar</button>
+                    </div>
+                    <p class="form-text mb-0 mt-1">A pessoa cria a conta com esse e-mail, confirma o e-mail e entra direto na sua oficina.</p>
+                </form>
+
+                <div class="subsection-label">Este aparelho</div>
+                <div class="conta-acoes">
+                    <button type="button" id="btnConfigIA" class="btn btn-light" data-bs-dismiss="modal"><i class="bi bi-stars"></i> Chave da IA</button>
+                    <button type="button" id="btnBackup" class="btn btn-light"><i class="bi bi-download"></i> Baixar backup</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnSair" class="btn btn-link text-danger me-auto"><i class="bi bi-box-arrow-right"></i> Sair da conta</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Avisos rápidos (toasts) -->
 <div id="toastArea" class="toast-area" aria-live="polite"></div>
 
@@ -462,6 +608,6 @@
 <div id="reciboImpressao" class="d-none d-print-block"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script type="module" src="app.js?v=9"></script>
+<script type="module" src="app.js?v=10"></script>
 </body>
 </html>

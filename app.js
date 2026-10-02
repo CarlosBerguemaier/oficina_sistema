@@ -1,6 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { Assistente } from "./assistente.js?v=9";
+import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { Assistente } from "./assistente.js?v=10";
+import { iniciarAcesso } from "./acesso.js?v=10";
+
+// Coleções que pertencem a cada oficina (usadas no backup e na importação)
+const COLECOES_DA_OFICINA = ["ordens_servico", "veiculos", "funcionarios"];
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE (Cole as suas chaves aqui)
 // ==========================================
@@ -238,13 +242,23 @@ const frotaBrasil = {
 // 3. CAMADA DE BANCO DE DADOS
 // ==========================================
 class BancoDeDados {
-    constructor(db) {
+    // Todos os dados ficam dentro da oficina: oficinas/{oficinaId}/{coleção}
+    constructor(db, oficinaId) {
         this.db = db;
+        this.oficinaId = oficinaId;
+    }
+
+    col(nome) {
+        return collection(this.db, "oficinas", this.oficinaId, nome);
+    }
+
+    ref(nome, id) {
+        return doc(this.db, "oficinas", this.oficinaId, nome, id);
     }
 
     async buscarVeiculoPorPlaca(placa) {
         try {
-            const veiculosRef = collection(this.db, "veiculos");
+            const veiculosRef = this.col("veiculos");
             const q = query(veiculosRef, where("placa", "==", placa.toUpperCase()));
             const querySnapshot = await getDocs(q);
             
@@ -263,11 +277,11 @@ class BancoDeDados {
     async salvarNovaOS(dadosOS) {
         try {
             // Salva a Ordem de Serviço
-            const osRef = collection(this.db, "ordens_servico");
+            const osRef = this.col("ordens_servico");
             await addDoc(osRef, dadosOS);
 
             // Atualiza ou Cria o cadastro do Veículo no banco para preencher sozinho na próxima vez
-            const veiculoRef = doc(this.db, "veiculos", dadosOS.placa);
+            const veiculoRef = this.ref("veiculos", dadosOS.placa);
             await setDoc(veiculoRef, {
                 placa: dadosOS.placa,
                 nomeCliente: dadosOS.nomeCliente,
@@ -286,7 +300,7 @@ class BancoDeDados {
 
     async buscarUltimasOS() {
         try {
-            const osRef = collection(this.db, "ordens_servico");
+            const osRef = this.col("ordens_servico");
             // Busca as últimas 200 OSs ordenadas pela data de entrada
             const q = query(osRef, orderBy("dataEntrada", "desc"), limit(200));
             const querySnapshot = await getDocs(q);
@@ -304,11 +318,11 @@ class BancoDeDados {
 
 async atualizarOS(id, dadosOS) {
         try {
-            const osRef = doc(this.db, "ordens_servico", id);
+            const osRef = this.ref("ordens_servico", id);
             await updateDoc(osRef, dadosOS);
             
             // Atualiza também o cadastro do veículo para manter os dados sincronizados
-            const veiculoRef = doc(this.db, "veiculos", dadosOS.placa);
+            const veiculoRef = this.ref("veiculos", dadosOS.placa);
             await setDoc(veiculoRef, {
                 placa: dadosOS.placa,
                 nomeCliente: dadosOS.nomeCliente,
@@ -327,7 +341,7 @@ async atualizarOS(id, dadosOS) {
 
     async excluirOS(id) {
         try {
-            const osRef = doc(this.db, "ordens_servico", id);
+            const osRef = this.ref("ordens_servico", id);
             await deleteDoc(osRef);
             return true;
         } catch (error) {
@@ -338,29 +352,96 @@ async atualizarOS(id, dadosOS) {
 
     // ---------- FUNCIONÁRIOS ----------
     // O id do funcionário é a chave usada em os.comissao (ex: { carlos: 40 }).
-    // Carlos e Ratinho usam os ids "carlos" e "ratinho" para as OS antigas continuarem valendo.
     async listarFuncionarios() {
-        const funcRef = collection(this.db, "funcionarios");
-        let snapshot = await getDocs(funcRef);
-
-        // Primeira vez: cadastra a equipe que já existia no sistema
-        if (snapshot.empty) {
-            const agora = new Date().toISOString();
-            await setDoc(doc(this.db, "funcionarios", "carlos"), { nome: "Carlos", ativo: true, criadoEm: agora });
-            await setDoc(doc(this.db, "funcionarios", "ratinho"), { nome: "Ratinho", ativo: true, criadoEm: agora });
-            snapshot = await getDocs(funcRef);
-        }
-
+        const snapshot = await getDocs(this.col("funcionarios"));
         const lista = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
     }
 
     async adicionarFuncionario(nome) {
-        await addDoc(collection(this.db, "funcionarios"), { nome, ativo: true, criadoEm: new Date().toISOString() });
+        await addDoc(this.col("funcionarios"), { nome, ativo: true, criadoEm: new Date().toISOString() });
     }
 
     async atualizarFuncionario(id, dados) {
-        await updateDoc(doc(this.db, "funcionarios", id), dados);
+        await updateDoc(this.ref("funcionarios", id), dados);
+    }
+
+    // ---------- OFICINA, USUÁRIOS E CONVITES ----------
+    async atualizarOficina(dados) {
+        await updateDoc(doc(this.db, "oficinas", this.oficinaId), dados);
+    }
+
+    async listarUsuarios() {
+        const q = query(collection(this.db, "usuarios"), where("oficinaId", "==", this.oficinaId));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ uid: d.id, ...d.data() }));
+    }
+
+    async removerUsuario(uid) {
+        await deleteDoc(doc(this.db, "usuarios", uid));
+    }
+
+    async listarConvites() {
+        const q = query(collection(this.db, "convites"), where("oficinaId", "==", this.oficinaId));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ email: d.id, ...d.data() }));
+    }
+
+    async convidar(email, oficinaNome, convidadoPor) {
+        await setDoc(doc(this.db, "convites", email), {
+            oficinaId: this.oficinaId,
+            oficinaNome,
+            convidadoPor,
+            criadoEm: new Date().toISOString()
+        });
+    }
+
+    async cancelarConvite(email) {
+        await deleteDoc(doc(this.db, "convites", email));
+    }
+
+    // ---------- BACKUP ----------
+    // Junta todos os dados da oficina num objeto só (para baixar como arquivo)
+    async gerarBackup() {
+        const backup = { geradoEm: new Date().toISOString(), oficinaId: this.oficinaId };
+        for (const nome of COLECOES_DA_OFICINA) {
+            const snapshot = await getDocs(this.col(nome));
+            backup[nome] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+        return backup;
+    }
+
+    // ---------- DADOS DO SISTEMA ANTIGO ----------
+    // Antes do login, os dados ficavam na raiz do banco (sem oficina).
+    // Depois que as regras novas forem publicadas, a raiz fica bloqueada e isto devolve false.
+    async existemDadosAntigos() {
+        try {
+            const jaImportado = await getDoc(doc(this.db, "migracao", "legado"));
+            if (jaImportado.exists()) return false;
+            const amostra = await getDocs(query(collection(this.db, "ordens_servico"), limit(1)));
+            return !amostra.empty;
+        } catch {
+            return false;
+        }
+    }
+
+    // Copia as coleções antigas da raiz para dentro da oficina, mantendo os mesmos ids
+    async importarDadosAntigos(aoProgredir) {
+        const resumo = {};
+        for (const nome of COLECOES_DA_OFICINA) {
+            const snapshot = await getDocs(collection(this.db, nome));
+            resumo[nome] = snapshot.size;
+            // O Firestore aceita até 500 gravações por lote
+            for (let i = 0; i < snapshot.docs.length; i += 400) {
+                const lote = writeBatch(this.db);
+                snapshot.docs.slice(i, i + 400).forEach(d => lote.set(this.ref(nome, d.id), d.data()));
+                await lote.commit();
+                aoProgredir?.(`${nome}: ${Math.min(i + 400, snapshot.size)} de ${snapshot.size}`);
+            }
+        }
+        // Marca como importado, para nenhuma outra conta importar de novo
+        await setDoc(doc(this.db, "migracao", "legado"), { oficinaId: this.oficinaId, importadoEm: new Date().toISOString(), resumo });
+        return resumo;
     }
 
 
@@ -521,8 +602,10 @@ setarDataAtual() {
 // 5. CONTROLADOR PRINCIPAL
 // ==========================================
 class App {
-    constructor() {
-        this.bd = new BancoDeDados(db);
+    // sessao: { usuario, perfil, oficina, sair } vinda do login (acesso.js)
+    constructor(sessao) {
+        this.sessao = sessao;
+        this.bd = new BancoDeDados(db, sessao.oficina.id);
         this.ui = new Interface();
         // Variáveis de controle para a Consulta
         this.todasAsOS = [];
@@ -543,7 +626,9 @@ class App {
 
         this.inicializarEventos();
         this.inicializarEquipe();
+        this.inicializarConta();
         this.carregarFuncionarios();
+        this.verificarDadosAntigos();
 
         this.assistente = new Assistente(
             frotaBrasil,
@@ -1474,6 +1559,169 @@ abrirModalDetalhes(id) {
     }
 
     // ==========================================
+    // CONTA: oficina, acessos, backup e sair
+    // ==========================================
+    get ehDono() {
+        return this.sessao.perfil.papel === "dono";
+    }
+
+    inicializarConta() {
+        const { usuario, oficina } = this.sessao;
+        document.getElementById("nomeOficinaHeader").textContent = oficina.nome;
+        document.getElementById("contaEmail").textContent = usuario.email;
+        document.getElementById("contaPapel").textContent = this.ehDono ? "Dono da oficina" : "Membro da oficina";
+
+        // Só o dono muda o nome e convida pessoas
+        const inputNome = document.getElementById("inputNomeOficina");
+        const inputCidade = document.getElementById("inputCidadeOficina");
+        inputNome.value = oficina.nome;
+        inputCidade.value = oficina.cidade || "";
+        inputNome.disabled = !this.ehDono;
+        inputCidade.disabled = !this.ehDono;
+        document.getElementById("btnSalvarNomeOficina").classList.toggle("d-none", !this.ehDono);
+        document.getElementById("formConvite").classList.toggle("d-none", !this.ehDono);
+
+        document.getElementById("modalConta").addEventListener("show.bs.modal", () => this.renderizarAcessos());
+
+        document.getElementById("formNomeOficina").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const nome = inputNome.value.trim();
+            const cidade = inputCidade.value.trim();
+            if (!nome) return;
+            try {
+                await this.bd.atualizarOficina({ nome, cidade });
+                Object.assign(this.sessao.oficina, { nome, cidade });
+                document.getElementById("nomeOficinaHeader").textContent = nome;
+                mostrarToast("Dados da oficina atualizados.");
+            } catch (error) {
+                console.error(error);
+                mostrarToast("Erro ao salvar o nome.", "erro");
+            }
+        });
+
+        document.getElementById("formConvite").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const input = document.getElementById("emailConvite");
+            const email = input.value.trim().toLowerCase();
+            if (!email) return;
+            if (email === usuario.email.toLowerCase()) {
+                mostrarToast("Esse é o seu próprio e-mail.", "erro");
+                return;
+            }
+            try {
+                await this.bd.convidar(email, this.sessao.oficina.nome, usuario.email);
+                input.value = "";
+                mostrarToast("Convite criado. Peça para a pessoa criar a conta com esse e-mail.");
+                this.renderizarAcessos();
+            } catch (error) {
+                console.error(error);
+                mostrarToast("Erro ao criar o convite.", "erro");
+            }
+        });
+
+        // Remover acesso / cancelar convite
+        document.getElementById("listaAcessos").addEventListener("click", async (e) => {
+            const botao = e.target.closest("[data-acao]");
+            if (!botao) return;
+            try {
+                if (botao.dataset.acao === "remover-usuario") {
+                    if (!confirm(`Tirar o acesso de ${botao.dataset.nome} ao sistema?`)) return;
+                    await this.bd.removerUsuario(botao.dataset.uid);
+                    mostrarToast("Acesso removido.");
+                }
+                if (botao.dataset.acao === "cancelar-convite") {
+                    await this.bd.cancelarConvite(botao.dataset.email);
+                    mostrarToast("Convite cancelado.");
+                }
+                this.renderizarAcessos();
+            } catch (error) {
+                console.error(error);
+                mostrarToast("Erro ao atualizar os acessos.", "erro");
+            }
+        });
+
+        document.getElementById("btnBackup").addEventListener("click", (e) => this.baixarBackup(e.currentTarget));
+
+        document.getElementById("btnSair").addEventListener("click", async () => {
+            if (!confirm("Sair da sua conta neste aparelho?")) return;
+            await this.sessao.sair();
+        });
+    }
+
+    async renderizarAcessos() {
+        const lista = document.getElementById("listaAcessos");
+        lista.innerHTML = '<div class="text-secondary small py-2"><span class="spinner-border spinner-border-sm me-2"></span>Carregando...</div>';
+        try {
+            const [usuarios, convites] = await Promise.all([this.bd.listarUsuarios(), this.bd.listarConvites()]);
+            const linhasUsuarios = usuarios.map(u => {
+                const nome = u.nome || u.email;
+                const voce = u.uid === this.sessao.usuario.uid ? ' <span class="text-secondary">(você)</span>' : "";
+                const acao = this.ehDono && u.papel !== "dono"
+                    ? `<button type="button" class="btn btn-light btn-sm text-danger" data-acao="remover-usuario" data-uid="${esc(u.uid)}" data-nome="${esc(nome)}">Remover</button>`
+                    : `<span class="acesso-papel">${u.papel === "dono" ? "Dono" : "Membro"}</span>`;
+                return `
+                    <div class="acesso-linha">
+                        <div class="acesso-info"><strong>${esc(nome)}${voce}</strong><span>${esc(u.email)}</span></div>
+                        ${acao}
+                    </div>`;
+            });
+            const linhasConvites = convites.map(c => `
+                <div class="acesso-linha">
+                    <div class="acesso-info"><strong>${esc(c.email)}</strong><span>Convite pendente</span></div>
+                    ${this.ehDono ? `<button type="button" class="btn btn-light btn-sm" data-acao="cancelar-convite" data-email="${esc(c.email)}">Cancelar</button>` : ""}
+                </div>`);
+            lista.innerHTML = [...linhasUsuarios, ...linhasConvites].join("");
+        } catch (error) {
+            console.error("Erro ao listar acessos:", error);
+            lista.innerHTML = '<div class="text-danger small py-2">Não foi possível carregar os acessos.</div>';
+        }
+    }
+
+    async baixarBackup(botao) {
+        botao.disabled = true;
+        try {
+            const backup = await this.bd.gerarBackup();
+            backup.oficina = this.sessao.oficina.nome;
+            const arquivo = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+            const link = document.createElement("a");
+            const hoje = new Date().toISOString().slice(0, 10);
+            link.href = URL.createObjectURL(arquivo);
+            link.download = `backup-parafusa-${hoje}.json`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            mostrarToast(`Backup baixado: ${backup.ordens_servico.length} ordens de serviço.`);
+        } catch (error) {
+            console.error("Erro no backup:", error);
+            mostrarToast("Erro ao gerar o backup.", "erro");
+        } finally {
+            botao.disabled = false;
+        }
+    }
+
+    // Oferece importar os dados do sistema antigo (só para o dono, só uma vez)
+    async verificarDadosAntigos() {
+        if (!this.ehDono || !(await this.bd.existemDadosAntigos())) return;
+        const aviso = document.getElementById("avisoDadosAntigos");
+        aviso.classList.remove("d-none");
+        document.getElementById("btnImportarAntigos").addEventListener("click", async (e) => {
+            const botao = e.currentTarget;
+            const progresso = document.getElementById("progressoImportacao");
+            if (!confirm(`Copiar todas as OS, veículos e funcionários do sistema antigo para "${this.sessao.oficina.nome}"?`)) return;
+            botao.disabled = true;
+            try {
+                const resumo = await this.bd.importarDadosAntigos(texto => progresso.textContent = `Copiando ${texto}...`);
+                aviso.classList.add("d-none");
+                mostrarToast(`Importado: ${resumo.ordens_servico} OS, ${resumo.veiculos} veículos e ${resumo.funcionarios} funcionários.`);
+                await this.carregarFuncionarios();
+            } catch (error) {
+                console.error("Erro na importação:", error);
+                progresso.textContent = "Erro ao importar. Nada foi perdido; tente de novo.";
+                botao.disabled = false;
+            }
+        });
+    }
+
+    // ==========================================
     // EQUIPE (FUNCIONÁRIOS)
     // ==========================================
     inicializarEquipe() {
@@ -1662,8 +1910,8 @@ imprimirReciboOS() {
         // Estrutura do Recibo (Estilo Cupom)
         const reciboHTML = `
             <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
-                <h2 style="margin: 0; font-weight: bold; text-transform: uppercase;">Oficina do Evandro</h2>
-                <p style="margin: 5px 0 0 0; font-size: 16px;">São Francisco de Assis - RS</p>
+                <h2 style="margin: 0; font-weight: bold; text-transform: uppercase;">${esc(this.sessao.oficina.nome)}</h2>
+                ${this.sessao.oficina.cidade ? `<p style="margin: 5px 0 0 0; font-size: 16px;">${esc(this.sessao.oficina.cidade)}</p>` : ""}
                 <p style="margin: 5px 0 0 0; font-size: 14px;">Documento Auxiliar de Prestação de Serviço</p>
                 <p style="margin: 0; font-size: 12px;">(Sem Valor Fiscal)</p>
             </div>
@@ -1714,5 +1962,9 @@ imprimirReciboOS() {
 
 }
 
-// Inicia a aplicação
-const oficinaApp = new App();
+// Inicia pelo login; o sistema só abre depois de entrar
+iniciarAcesso({
+    appFirebase,
+    db,
+    aoEntrar: (sessao) => new App(sessao)
+});

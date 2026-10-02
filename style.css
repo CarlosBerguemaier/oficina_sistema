@@ -69,6 +69,196 @@ input, select, textarea, button {
 }
 
 /* ==========================================
+   TELA DE ACESSO (login, cadastro, oficina)
+   Enquanto não há sessão, só ela aparece.
+   ========================================== */
+body.sem-sessao .app-header,
+body.sem-sessao .app-nav,
+body.sem-sessao .app-main {
+    display: none !important;
+}
+
+body.sem-sessao {
+    padding-bottom: 0;
+}
+
+.acesso {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    background:
+        radial-gradient(1200px 500px at 50% -10%, #1B5089 0%, transparent 60%),
+        var(--brand);
+}
+
+.acesso-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+    padding: 28px 24px;
+}
+
+.acesso-marca {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 24px;
+}
+
+.acesso-marca img {
+    border-radius: 14px;
+}
+
+.acesso-nome {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    color: var(--brand);
+    line-height: 1;
+    margin-top: 6px;
+}
+
+.acesso-slogan {
+    font-size: .85rem;
+    color: var(--muted);
+}
+
+.acesso-titulo {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.acesso-texto {
+    color: var(--text-2);
+    font-size: .92rem;
+    margin-bottom: 16px;
+}
+
+.acesso-link {
+    color: var(--brand);
+    font-weight: 600;
+    text-decoration: none;
+    font-size: .9rem;
+}
+
+.acesso-rodape {
+    text-align: center;
+    color: var(--muted);
+    font-size: .9rem;
+    margin: 18px 0 0;
+}
+
+.acesso-msg:not(:empty) {
+    margin-top: 16px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    font-size: .9rem;
+}
+
+.acesso-msg.erro {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.acesso-msg.ok {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+/* ==========================================
+   CONTA (modal)
+   ========================================== */
+.conta-usuario {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+}
+
+.conta-usuario i {
+    font-size: 2rem;
+    color: var(--brand);
+}
+
+.conta-usuario div {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.conta-usuario strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conta-usuario span {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.acesso-lista {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 14px;
+}
+
+.acesso-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.acesso-linha:last-child {
+    border-bottom: 0;
+}
+
+.acesso-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.acesso-info strong {
+    font-weight: 600;
+    font-size: .92rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.acesso-info span {
+    color: var(--muted);
+    font-size: .8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.acesso-papel {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.conta-acoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* ==========================================
    CABEÇALHO
    ========================================== */
 .app-header {
@@ -112,9 +302,9 @@ input, select, textarea, button {
 }
 
 .brand-name {
-    font-weight: 700;
-    font-size: 1.02rem;
-    letter-spacing: -.01em;
+    font-weight: 800;
+    font-size: 1.08rem;
+    letter-spacing: -.02em;
 }
 
 .brand-sub {

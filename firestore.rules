@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// ==========================================
+// REGRAS DE SEGURANÇA DO BANCO (Parafusa)
+// Cole este conteúdo em: Console do Firebase → Firestore Database → Regras → Publicar
+// ==========================================
+//
+// Estrutura:
+//   usuarios/{uid}                 → { oficinaId, nome, email, papel: "dono" | "membro" }
+//   oficinas/{oficinaId}           → { nome, donoUid }
+//   oficinas/{oficinaId}/...       → ordens_servico, veiculos, funcionarios (dados da oficina)
+//   convites/{email}               → { oficinaId, oficinaNome } (convite para entrar na oficina)
+//
+// Qualquer coisa fora disso (inclusive as coleções antigas da raiz) fica bloqueada.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() {
+      return request.auth != null;
+    }
+
+    function caminhoPerfil() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.uid);
+    }
+
+    function perfil() {
+      return get(caminhoPerfil()).data;
+    }
+
+    function membroDe(oficinaId) {
+      return logado() && exists(caminhoPerfil()) && perfil().oficinaId == oficinaId;
+    }
+
+    function donoDe(oficinaId) {
+      return membroDe(oficinaId) && perfil().papel == "dono";
+    }
+
+    function emailConfirmado() {
+      return logado() && request.auth.token.email_verified == true;
+    }
+
+    // ---------- Perfil do usuário ----------
+    match /usuarios/{uid} {
+      // Cada um lê o próprio perfil; membros veem quem mais tem acesso à oficina
+      allow read: if logado() && (request.auth.uid == uid || membroDe(resource.data.oficinaId));
+
+      // Criar o próprio perfil:
+      //  - como dono da oficina que está sendo criada junto (mesmo lote de gravação), ou
+      //  - como membro, se existe convite para o e-mail confirmado dele
+      allow create: if logado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["oficinaId", "nome", "email", "papel", "criadoEm"])
+        && (
+          (request.resource.data.papel == "dono"
+            && getAfter(/databases/$(database)/documents/oficinas/$(request.resource.data.oficinaId)).data.donoUid == request.auth.uid)
+          ||
+          (request.resource.data.papel == "membro"
+            && emailConfirmado()
+            && get(/databases/$(database)/documents/convites/$(request.auth.token.email.lower())).data.oficinaId == request.resource.data.oficinaId)
+        );
+
+      // O dono pode tirar o acesso de um membro (nunca de outro dono)
+      allow delete: if donoDe(resource.data.oficinaId) && resource.data.papel == "membro";
+      allow update: if false;
+    }
+
+    // ---------- Oficina ----------
+    match /oficinas/{oficinaId} {
+      allow read: if membroDe(oficinaId);
+
+      // Só quem ainda não tem oficina pode criar uma, e vira o dono dela
+      allow create: if logado()
+        && !exists(caminhoPerfil())
+        && request.resource.data.donoUid == request.auth.uid;
+
+      // O dono pode mudar dados da oficina (ex: nome), mas não trocar o dono
+      allow update: if donoDe(oficinaId) && request.resource.data.donoUid == resource.data.donoUid;
+      allow delete: if false;
+
+      // Dados da oficina: OS, veículos, funcionários, etc.
+      match /{documento=**} {
+        allow read, write: if membroDe(oficinaId);
+      }
+    }
+
+    // ---------- Convites ----------
+    match /convites/{email} {
+      // A pessoa convidada (com e-mail confirmado) lê o convite dela; membros veem os convites da oficina
+      allow read: if (emailConfirmado() && request.auth.token.email.lower() == email)
+        || (logado() && membroDe(resource.data.oficinaId));
+
+      // Só o dono convida, e o id do convite é o e-mail em minúsculas
+      allow create: if donoDe(request.resource.data.oficinaId) && email == email.lower();
+
+      // O dono cancela; a pessoa convidada apaga ao aceitar
+      allow delete: if logado() && (
+        donoDe(resource.data.oficinaId)
+        || (emailConfirmado() && request.auth.token.email.lower() == email)
+      );
+      allow update: if false;
+    }
+  }
+}

@@ -274,7 +274,9 @@ export class Assistente {
     }
 
     atualizarBotaoMicrofone() {
-        this.btnMicrofone.textContent = this.gravando ? "⏹️ Parar" : "🎤 Gravar";
+        this.btnMicrofone.innerHTML = this.gravando
+            ? '<i class="bi bi-stop-fill"></i> Parar'
+            : '<i class="bi bi-mic-fill"></i> Gravar';
         this.btnMicrofone.classList.toggle("btn-danger", this.gravando);
         this.btnMicrofone.classList.toggle("btn-outline-danger", !this.gravando);
     }

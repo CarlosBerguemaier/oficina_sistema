@@ -2,100 +2,148 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oficina - Ordens de Serviço</title>
-    <!-- Bootstrap 5 CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Oficina do Evandro · Ordens de Serviço</title>
+
+    <!-- Fonte, Bootstrap e Ícones -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=8">
+
     <!-- Configurações para Tela Inicial de Celular -->
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
-    <meta name="theme-color" content="#0d6efd"> <!-- Cor da barra do navegador (Azul Bootstrap) -->
+    <meta name="theme-color" content="#0E3A66">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
-<body class="bg-light">
+<body>
 
-
-<div class="container py-4 max-w-custom">
-
-<div class="text-center mb-3">
-        <img src="logo.png" alt="Oficina do Evandro" class="img-fluid" style="max-width: 150px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-    </div>
-
-  <h2 class="text-center mb-4" id="tituloPagina">Nova Ordem de Serviço</h2>
-
-    <!-- Menu de Navegação -->
-    <!-- Menu de Navegação -->
-    <div class="d-flex justify-content-center mb-4 gap-2">
-        <button id="btnAbaNovaOS" class="btn btn-primary w-100">Nova OS</button>
-        <button id="btnAbaConsulta" class="btn btn-outline-primary w-100">Consultar</button>
-        <button id="btnAbaFinanceiro" class="btn btn-outline-primary w-100">Financeiro</button>
-    </div>
-
-    <!-- Container da Nova OS -->
-    <div id="containerNovaOS">
-
-    <!-- Assistente de IA: Ditado e Foto do caderno -->
-    <div class="card shadow-sm mb-4 border-primary">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-bold">Preencher automático</span>
-                <button type="button" id="btnConfigIA" class="btn btn-sm btn-outline-secondary" title="Configurar chave da IA">⚙️</button>
+<!-- ==========================================
+     CABEÇALHO
+     ========================================== -->
+<header class="app-header">
+    <div class="app-header-inner">
+        <div class="brand">
+            <img src="logo.png" alt="" class="brand-logo">
+            <div class="brand-text">
+                <span class="brand-name">Oficina do Evandro</span>
+                <span class="brand-sub">Gestão de ordens de serviço</span>
             </div>
-            <div class="d-flex gap-2">
-                <button type="button" id="btnDitarOS" class="btn btn-outline-primary btn-lg w-50">🎤 Ditar OS</button>
-                <button type="button" id="btnFotoCaderno" class="btn btn-outline-primary btn-lg w-50">📷 Foto do caderno</button>
+        </div>
+        <button type="button" id="btnConfigIA" class="btn-icon" title="Configurar chave da IA" aria-label="Configurar chave da IA">
+            <i class="bi bi-gear"></i>
+        </button>
+    </div>
+</header>
+
+<!-- ==========================================
+     NAVEGAÇÃO (abas no computador, barra inferior no celular)
+     ========================================== -->
+<nav class="app-nav" aria-label="Menu principal">
+    <div class="app-nav-inner">
+        <button type="button" id="btnAbaNovaOS" class="nav-tab active">
+            <i class="bi bi-plus-circle"></i><span>Nova OS</span>
+        </button>
+        <button type="button" id="btnAbaConsulta" class="nav-tab">
+            <i class="bi bi-card-list"></i><span>Consultar</span>
+        </button>
+        <button type="button" id="btnAbaFinanceiro" class="nav-tab">
+            <i class="bi bi-graph-up-arrow"></i><span>Financeiro</span>
+        </button>
+    </div>
+</nav>
+
+<main class="app-main">
+
+    <div class="page-head">
+        <h1 id="tituloPagina">Nova Ordem de Serviço</h1>
+    </div>
+
+    <!-- ==========================================
+         TELA: NOVA OS
+         ========================================== -->
+    <section id="containerNovaOS">
+
+        <!-- Preencher com IA -->
+        <div class="panel panel-ai">
+            <div class="panel-ai-head">
+                <span class="ai-badge"><i class="bi bi-stars"></i> IA</span>
+                <div>
+                    <h2 class="panel-title">Preencher automaticamente</h2>
+                    <p class="panel-hint">Fale os dados ou fotografe o caderno. Você confere tudo antes de salvar.</p>
+                </div>
+            </div>
+            <div class="ai-actions">
+                <button type="button" id="btnDitarOS" class="ai-tile">
+                    <span class="ai-tile-icon"><i class="bi bi-mic"></i></span>
+                    <span class="ai-tile-text">
+                        <strong>Ditar OS</strong>
+                        <small>Fale do seu jeito</small>
+                    </span>
+                </button>
+                <button type="button" id="btnFotoCaderno" class="ai-tile">
+                    <span class="ai-tile-icon"><i class="bi bi-camera"></i></span>
+                    <span class="ai-tile-text">
+                        <strong>Foto do caderno</strong>
+                        <small>Uma ou várias páginas</small>
+                    </span>
+                </button>
             </div>
             <input type="file" id="inputFotoCaderno" accept="image/*" multiple class="d-none">
 
-            <div id="painelDitado" class="d-none mt-3">
-                <textarea id="textoDitado" class="form-control mb-2" rows="5" placeholder="Ex: Placa ABC1234, Gol do João, 1.6 2015, 98 mil 560 km, troca de óleo e filtro, mão de obra 150, óleo 80, Ratinho 40"></textarea>
-                <div class="d-flex gap-2">
-                    <button type="button" id="btnMicrofone" class="btn btn-outline-danger w-50">🎤 Gravar</button>
-                    <button type="button" id="btnOrganizarDitado" class="btn btn-primary w-50">✨ Preencher</button>
+            <div id="painelDitado" class="d-none ditado">
+                <textarea id="textoDitado" class="form-control" rows="5" placeholder="Ex: Placa ABC1234, Gol do João, 1.6 2015, 98 mil 560 km, troca de óleo e filtro, mão de obra 150, óleo 80, Ratinho 40"></textarea>
+                <div class="ditado-actions">
+                    <button type="button" id="btnFecharDitado" class="btn btn-link text-secondary btn-sm">Fechar</button>
+                    <button type="button" id="btnMicrofone" class="btn btn-outline-danger"><i class="bi bi-mic-fill"></i> Gravar</button>
+                    <button type="button" id="btnOrganizarDitado" class="btn btn-primary"><i class="bi bi-stars"></i> Preencher</button>
                 </div>
-                <button type="button" id="btnFecharDitado" class="btn btn-link btn-sm text-muted w-100 mt-1">Fechar</button>
             </div>
-            <div id="statusAssistente" class="mt-2"></div>
+            <div id="statusAssistente"></div>
         </div>
-    </div>
 
-    <!-- Seção 1: Busca pela Placa -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <label for="placaBusca" class="form-label fw-bold">Placa do Veículo</label>
-            <div class="input-group input-group-lg">
-                <input type="text" id="placaBusca" class="form-control text-uppercase" placeholder="ABC-1234" autocomplete="off">
-                <button class="btn btn-primary" id="btnBuscarPlaca" type="button">Buscar</button>
+        <!-- Busca pela placa -->
+        <div class="panel">
+            <label for="placaBusca" class="form-label">Placa do veículo</label>
+            <div class="placa-search">
+                <input type="text" id="placaBusca" class="form-control form-control-lg placa-input" placeholder="ABC1D23" autocomplete="off" maxlength="8">
+                <button class="btn btn-primary btn-lg" id="btnBuscarPlaca" type="button">Buscar</button>
             </div>
-            <div id="alertaBusca" class="mt-2"></div>
+            <div id="alertaBusca" class="busca-status"></div>
         </div>
-    </div>
 
-    <!-- Aviso das OS preenchidas pela IA (fila) -->
-    <div id="avisoFilaIA" class="d-none alert alert-warning">
-        <div class="fw-bold" id="textoFilaIA"></div>
-        <div id="observacoesIA" class="small mt-1"></div>
-        <button type="button" id="btnPularOSIA" class="btn btn-sm btn-outline-dark mt-2">Pular esta OS</button>
-    </div>
+        <!-- Aviso das OS preenchidas pela IA (fila) -->
+        <div id="avisoFilaIA" class="d-none callout callout-warning">
+            <i class="bi bi-stars callout-icon"></i>
+            <div class="callout-body">
+                <div class="fw-semibold" id="textoFilaIA"></div>
+                <div id="observacoesIA" class="small mt-1"></div>
+                <button type="button" id="btnPularOSIA" class="btn btn-sm btn-light mt-2">Pular esta OS</button>
+            </div>
+        </div>
 
-    <!-- Seção 2: Formulário da OS (Escondido até a busca) -->
-    <form id="formOS" class="d-none">
-        
-  <!-- Dados do Cliente e Carro -->
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-secondary text-white">Dados do Cliente e Veículo</div>
-            <div class="card-body">
+        <!-- Formulário da OS (aparece após a busca) -->
+        <form id="formOS" class="d-none">
+
+            <!-- 1. Cliente e veículo -->
+            <div class="panel">
+                <div class="section-head">
+                    <span class="section-num">1</span>
+                    <h2 class="panel-title">Cliente e veículo</h2>
+                </div>
+
                 <div class="mb-3">
-                    <label class="form-label text-primary fw-bold">Nome do Cliente</label>
+                    <label for="nomeCliente" class="form-label">Nome do cliente</label>
                     <input type="text" id="nomeCliente" class="form-control" required>
                 </div>
-                
-                <div class="row">
-                    <!-- 1. Marca -->
-                    <div class="col-12 col-md-4 mb-3">
-                        <label class="form-label">Marca</label>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-4">
+                        <label for="marcaCarro" class="form-label">Marca</label>
                         <select id="marcaCarro" class="form-select" required>
                             <option value="">Selecione...</option>
                             <!-- Marcas injetadas pelo JS -->
@@ -103,19 +151,15 @@
                         </select>
                         <input type="text" id="outraMarca" class="form-control mt-2 d-none" placeholder="Digite a marca">
                     </div>
-                    
-                    <!-- 2. Modelo -->
-                    <div class="col-12 col-md-4 mb-3">
-                        <label class="form-label">Modelo</label>
+                    <div class="col-12 col-md-4">
+                        <label for="modeloCarro" class="form-label">Modelo</label>
                         <select id="modeloCarro" class="form-select" disabled required>
                             <option value="">Aguardando marca...</option>
                         </select>
                         <input type="text" id="outroModelo" class="form-control mt-2 d-none" placeholder="Digite o modelo">
                     </div>
-
-                    <!-- 3. Motor (Litragem) -->
-                    <div class="col-12 col-md-4 mb-3">
-                        <label class="form-label">Motor</label>
+                    <div class="col-12 col-md-4">
+                        <label for="litragemCarro" class="form-label">Motor</label>
                         <select id="litragemCarro" class="form-select" disabled required>
                             <option value="">Aguardando modelo...</option>
                         </select>
@@ -123,66 +167,79 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label">Ano</label>
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <label for="anoCarro" class="form-label">Ano</label>
                         <input type="number" id="anoCarro" class="form-control" placeholder="Ex: 2015" required>
                     </div>
                 </div>
 
-
-                <!-- Histórico (Se for cliente antigo) -->
-        <div id="areaHistorico" class="d-none alert alert-info p-2 mt-2">
-            <p class="mb-1 fw-bold">Cliente já possui histórico!</p>
-            <!-- Adicionado o id="btnVerHistorico" e garantido o type="button" -->
-            <button type="button" id="btnVerHistorico" class="btn btn-sm btn-outline-info w-100 bg-white">Ver Ordens Anteriores</button>
-        </div>
+                <!-- Histórico (se for cliente antigo) -->
+                <div id="areaHistorico" class="d-none callout callout-info mt-3 mb-0">
+                    <i class="bi bi-clock-history callout-icon"></i>
+                    <div class="callout-body d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
+                        <span class="fw-semibold">Este veículo já tem serviços anteriores.</span>
+                        <button type="button" id="btnVerHistorico" class="btn btn-sm btn-light">Ver histórico</button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!-- Dados do Serviço -->
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-secondary text-white">Detalhes do Serviço</div>
-            <div class="card-body">
-                <!-- NOVO CAMPO DE DATA AQUI -->
-                <div class="row mb-3">
-                    <div class="col-12">
-                        <label class="form-label fw-bold text-primary">Data da Ordem de Serviço</label>
+            <!-- 2. Serviço -->
+            <div class="panel">
+                <div class="section-head">
+                    <span class="section-num">2</span>
+                    <h2 class="panel-title">Serviço realizado</h2>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="dataOS" class="form-label">Data</label>
                         <input type="date" id="dataOS" class="form-control" required>
                     </div>
-                </div>
-             <div class="row">
-                    <div class="col-12 mb-3">
-                        <label class="form-label">Quilometragem</label>
-                        <input type="text" inputmode="numeric" id="quilometragem" class="form-control" placeholder="Ex: 98.560" required>
+                    <div class="col-6">
+                        <label for="quilometragem" class="form-label">Quilometragem</label>
+                        <div class="input-suffix">
+                            <input type="text" inputmode="numeric" id="quilometragem" class="form-control" placeholder="98.560" required>
+                            <span>km</span>
+                        </div>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Descrição do que foi feito</label>
-                    <textarea id="descricao" class="form-control" rows="3" required></textarea>
-                </div>
+                <label for="descricao" class="form-label">Descrição do que foi feito</label>
+                <textarea id="descricao" class="form-control" rows="4" required></textarea>
             </div>
-        </div>
 
-        <!-- Fechamento e Comissão -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-secondary text-white">Faturamento e Repasse</div>
-            <div class="card-body">
-              <div class="mb-3">
-                    <label class="form-label fw-bold text-primary">Valor da Mão de Obra (R$)</label>
-                    <input type="number" id="valorMaoDeObra" step="0.01" class="form-control form-control-lg fw-bold" required>
+            <!-- 3. Valores -->
+            <div class="panel">
+                <div class="section-head">
+                    <span class="section-num">3</span>
+                    <h2 class="panel-title">Valores</h2>
                 </div>
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label text-primary">Repasse Carlos (R$)</label>
-                        <input type="number" id="repasseCarlos" step="0.01" class="form-control" placeholder="0.00">
+
+                <label for="valorMaoDeObra" class="form-label">Mão de obra</label>
+                <div class="input-prefix mb-3">
+                    <span>R$</span>
+                    <input type="number" id="valorMaoDeObra" step="0.01" class="form-control form-control-lg fw-semibold" placeholder="0,00" required>
+                </div>
+
+                <div class="subsection-label">Repasses</div>
+                <div class="row g-3 mb-1">
+                    <div class="col-6">
+                        <label for="repasseCarlos" class="form-label">Carlos</label>
+                        <div class="input-prefix">
+                            <span>R$</span>
+                            <input type="number" id="repasseCarlos" step="0.01" class="form-control" placeholder="0,00">
+                        </div>
                     </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label text-primary">Repasse Ratinho (R$)</label>
-                        <input type="number" id="repasseRatinho" step="0.01" class="form-control" placeholder="0.00">
+                    <div class="col-6">
+                        <label for="repasseRatinho" class="form-label">Ratinho</label>
+                        <div class="input-prefix">
+                            <span>R$</span>
+                            <input type="number" id="repasseRatinho" step="0.01" class="form-control" placeholder="0,00">
+                        </div>
                     </div>
-                    <hr class="mt-4 mb-3">
-                <h6 class="text-primary fw-bold">Outros Gastos / Repasses (Peças, Retífica, Óleo, etc.)</h6>
+                </div>
+                <p class="form-text mb-3">Deixe em branco se não houver repasse. O restante da mão de obra fica para a oficina.</p>
+
+                <div class="subsection-label">Peças e outros gastos</div>
                 <div id="containerOutrosRepasses">
                     <div class="row repasse-item mb-2">
                         <div class="col-8">
@@ -193,183 +250,181 @@
                         </div>
                     </div>
                 </div>
-                <div class="form-text mt-3">Os campos acima são opcionais. Ao digitar a descrição de um gasto, uma nova linha vazia aparecerá automaticamente abaixo.</div>
-                </div>
-                <div class="form-text mt-0">Deixe zerado se não houver repasse para um dos dois. O restante do valor fica para a oficina.</div>
-            <hr class="mt-4 mb-3 border-2 border-dark">
-                <div class="bg-light p-3 rounded border text-end">
-                    <label class="form-label fw-bold text-success fs-5 mb-1">TOTAL A COBRAR DO CLIENTE (R$)</label>
-                    <input type="number" id="valorGrandeTotal" class="form-control form-control-lg text-success fw-bold text-end" readonly placeholder="R$ 0.00">
+                <p class="form-text mb-0">Ao preencher uma linha, outra aparece logo abaixo.</p>
+
+                <div class="total-box">
+                    <span>Total a cobrar do cliente</span>
+                    <div class="total-value">
+                        <small>R$</small>
+                        <input type="number" id="valorGrandeTotal" readonly placeholder="0.00" tabindex="-1">
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Botões de Ação -->
-        <div class="d-flex gap-2 mb-5">
-            <button type="button" id="btnCancelar" class="btn btn-outline-danger btn-lg w-50">Cancelar</button>
-            <button type="submit" class="btn btn-success btn-lg w-50">Salvar Ordem</button>
-        </div>
+            <!-- Ações (fixas no rodapé) -->
+            <div class="action-bar">
+                <button type="button" id="btnCancelar" class="btn btn-light btn-lg">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-lg">Salvar Ordem</button>
+            </div>
+        </form>
+    </section>
 
-        </div> <!-- Fim containerNovaOS -->
-
-    <!-- Container de Consulta de OS (Escondido por padrão) -->
-    <div id="containerConsultaOS" class="d-none">
-        <!-- Filtros -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-secondary text-white">Filtros de Busca</div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Data Exata</label>
+    <!-- ==========================================
+         TELA: CONSULTA
+         ========================================== -->
+    <section id="containerConsultaOS" class="d-none">
+        <div class="panel">
+            <div class="search-row">
+                <div class="search-field">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="filtroPlaca" class="form-control text-uppercase" placeholder="Placa">
+                </div>
+                <button type="button" class="btn btn-light" data-bs-toggle="collapse" data-bs-target="#filtrosAvancados" aria-expanded="false">
+                    <i class="bi bi-sliders"></i><span class="d-none d-sm-inline ms-1">Filtros</span>
+                </button>
+                <button type="button" id="btnAplicarFiltros" class="btn btn-primary">Buscar</button>
+            </div>
+            <div class="collapse" id="filtrosAvancados">
+                <div class="row g-3 pt-3">
+                    <div class="col-12 col-md-4">
+                        <label for="filtroData" class="form-label">Data exata</label>
                         <input type="date" id="filtroData" class="form-control">
                     </div>
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Placa</label>
-                        <input type="text" id="filtroPlaca" class="form-control text-uppercase" placeholder="ABC-1234">
-                    </div>
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Marca</label>
+                    <div class="col-6 col-md-4">
+                        <label for="filtroMarca" class="form-label">Marca</label>
                         <input type="text" id="filtroMarca" class="form-control text-uppercase" placeholder="Ex: CHEVROLET">
                     </div>
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Modelo</label>
+                    <div class="col-6 col-md-4">
+                        <label for="filtroModelo" class="form-label">Modelo</label>
                         <input type="text" id="filtroModelo" class="form-control text-uppercase" placeholder="Ex: ONIX">
                     </div>
                 </div>
-                <div class="d-flex justify-content-end mt-2">
-                    <button id="btnLimparFiltros" class="btn btn-outline-secondary me-2">Limpar</button>
-                    <button id="btnAplicarFiltros" class="btn btn-primary">Buscar</button>
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="button" id="btnLimparFiltros" class="btn btn-link text-secondary">Limpar filtros</button>
                 </div>
             </div>
         </div>
 
-        <!-- Tabela e Paginação -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">Ordens de Serviço Cadastradas</div>
-            <div class="card-body p-0 table-responsive">
-                <table class="table table-striped table-hover mb-0">
-                <thead class="table-light">
-                        <tr>
-                            <th class="text-center" style="width: 50px;"></th> <!-- Ícone Ver -->
-                            <th>Veículo</th>
-                            <th>Descrição</th>
-                            <th>Cliente</th>
-                            <th>Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabelaOSBody">
-                        <tr><td colspan="5" class="text-center py-3">Aguardando busca...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer d-flex justify-content-between align-items-center bg-white">
-                <button id="btnPaginaAnterior" class="btn btn-sm btn-outline-primary" disabled>Anterior</button>
-                <span id="textoPaginacao" class="text-muted small fw-bold">Página 1</span>
-                <button id="btnPaginaProxima" class="btn btn-sm btn-outline-primary" disabled>Próxima</button>
-            </div>
+        <div id="tabelaOSBody" class="os-list">
+            <div class="empty-state">Aguardando busca...</div>
         </div>
-    </div>
 
-    <!-- Container Financeiro (Escondido por padrão) -->
-    <div id="containerFinanceiro" class="d-none">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Painel Financeiro Mensal</h5>
-                <input type="month" id="filtroMesFinanceiro" class="form-control form-control-sm w-auto">
+        <div class="pager">
+            <button type="button" id="btnPaginaAnterior" class="btn btn-light" disabled><i class="bi bi-chevron-left"></i> Anterior</button>
+            <span id="textoPaginacao">Página 1</span>
+            <button type="button" id="btnPaginaProxima" class="btn btn-light" disabled>Próxima <i class="bi bi-chevron-right"></i></button>
+        </div>
+    </section>
+
+    <!-- ==========================================
+         TELA: FINANCEIRO
+         ========================================== -->
+    <section id="containerFinanceiro" class="d-none">
+        <div class="fin-toolbar">
+            <label for="filtroMesFinanceiro" class="form-label mb-0">Mês de referência</label>
+            <input type="month" id="filtroMesFinanceiro" class="form-control">
+        </div>
+
+        <!-- Indicadores do mês -->
+        <div class="kpi-grid">
+            <div class="kpi">
+                <span class="kpi-label">Faturado no mês</span>
+                <span class="kpi-value" id="totalFaturado">R$ 0,00</span>
             </div>
-            <div class="card-body">
-                <div class="row text-center mb-4">
-                    <!-- Card Oficina -->
-                    <div class="col-md-4 mb-3">
-                        <div class="card border-primary h-100">
-                            <div class="card-body">
-                                <h5 class="card-title text-primary fw-bold">Oficina (Líquido)</h5>
-                                <h3 class="text-success fw-bold my-3" id="totalOficina">R$ 0,00</h3>
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-sm btn-outline-primary w-50 btn-expandir-fin" data-tipo="oficina">🔍 Expandir</button>
-                                    <button class="btn btn-sm btn-success w-50 btn-whats-fin" data-tipo="oficina">📱 WhatsApp</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Card Carlos -->
-                    <div class="col-md-4 mb-3">
-                        <div class="card border-info h-100">
-                            <div class="card-body">
-                                <h5 class="card-title text-info fw-bold">Carlos</h5>
-                                <h3 class="text-success fw-bold my-3" id="totalCarlos">R$ 0,00</h3>
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-sm btn-outline-info w-50 btn-expandir-fin" data-tipo="carlos">🔍 Expandir</button>
-                                    <button class="btn btn-sm btn-success w-50 btn-whats-fin" data-tipo="carlos">📱 WhatsApp</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Card Ratinho -->
-                    <div class="col-md-4 mb-3">
-                        <div class="card border-warning h-100">
-                            <div class="card-body">
-                                <h5 class="card-title text-warning fw-bold">Ratinho</h5>
-                                <h3 class="text-success fw-bold my-3" id="totalRatinho">R$ 0,00</h3>
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-sm btn-outline-warning w-50 btn-expandir-fin" data-tipo="ratinho">🔍 Expandir</button>
-                                    <button class="btn btn-sm btn-success w-50 btn-whats-fin" data-tipo="ratinho">📱 WhatsApp</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="kpi">
+                <span class="kpi-label">Ordens de serviço</span>
+                <span class="kpi-value" id="qtdOS">0</span>
+            </div>
+            <div class="kpi">
+                <span class="kpi-label">Peças e gastos</span>
+                <span class="kpi-value" id="totalGastos">R$ 0,00</span>
+            </div>
+        </div>
+
+        <h2 class="section-title">Divisão dos ganhos</h2>
+        <div class="split-grid">
+            <div class="split-card split-oficina">
+                <div class="split-head">
+                    <span class="split-icon"><i class="bi bi-shop"></i></span>
+                    <span class="split-name">Oficina <small>(líquido)</small></span>
                 </div>
-                
-                <div class="d-flex justify-content-center mt-2">
-                    <button id="btnWhatsGeral" class="btn btn-dark btn-lg w-100">📄 Exportar Resumo Geral (WhatsApp)</button>
+                <div class="split-value" id="totalOficina">R$ 0,00</div>
+                <div class="split-actions">
+                    <button type="button" class="btn btn-light btn-sm btn-expandir-fin" data-tipo="oficina"><i class="bi bi-list-ul"></i> Detalhes</button>
+                    <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="oficina"><i class="bi bi-whatsapp"></i> Enviar</button>
+                </div>
+            </div>
+            <div class="split-card split-carlos">
+                <div class="split-head">
+                    <span class="split-icon"><i class="bi bi-person"></i></span>
+                    <span class="split-name">Carlos</span>
+                </div>
+                <div class="split-value" id="totalCarlos">R$ 0,00</div>
+                <div class="split-actions">
+                    <button type="button" class="btn btn-light btn-sm btn-expandir-fin" data-tipo="carlos"><i class="bi bi-list-ul"></i> Detalhes</button>
+                    <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="carlos"><i class="bi bi-whatsapp"></i> Enviar</button>
+                </div>
+            </div>
+            <div class="split-card split-ratinho">
+                <div class="split-head">
+                    <span class="split-icon"><i class="bi bi-person"></i></span>
+                    <span class="split-name">Ratinho</span>
+                </div>
+                <div class="split-value" id="totalRatinho">R$ 0,00</div>
+                <div class="split-actions">
+                    <button type="button" class="btn btn-light btn-sm btn-expandir-fin" data-tipo="ratinho"><i class="bi bi-list-ul"></i> Detalhes</button>
+                    <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="ratinho"><i class="bi bi-whatsapp"></i> Enviar</button>
                 </div>
             </div>
         </div>
-    </div>
-    </form>
-</div>
-<!-- Modal Detalhes da OS -->
+
+        <button type="button" id="btnWhatsGeral" class="btn btn-whats btn-lg w-100 mt-3">
+            <i class="bi bi-whatsapp"></i> Enviar fechamento do mês no WhatsApp
+        </button>
+    </section>
+</main>
+
+<!-- ==========================================
+     MODAL: DETALHES DA OS
+     ========================================== -->
 <div class="modal fade" id="modalDetalhesOS" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Detalhes da Ordem de Serviço</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header">
+                <h5 class="modal-title">Ordem de serviço</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body" id="conteudoDetalhesOS">
-                <!-- Conteúdo será injetado pelo JavaScript -->
+                <!-- Conteúdo injetado pelo JavaScript -->
             </div>
-            <div class="modal-footer justify-content-between">
-                <button type="button" class="btn btn-danger" id="btnExcluirOS">❌ Excluir</button>
-                <div>
-                    <button type="button" class="btn btn-dark" id="btnImprimirOS">🖨️ Imprimir Recibo</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" class="btn btn-warning" id="btnEditarOS">✏️ Editar</button>
-                </div>
-            </div>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link text-danger me-auto" id="btnExcluirOS"><i class="bi bi-trash3"></i> Excluir</button>
+                <button type="button" class="btn btn-light" id="btnImprimirOS"><i class="bi bi-printer"></i> Recibo</button>
+                <button type="button" class="btn btn-primary" id="btnEditarOS"><i class="bi bi-pencil"></i> Editar</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Detalhes Financeiro -->
+<!-- ==========================================
+     MODAL: DETALHES DO FINANCEIRO
+     ========================================== -->
 <div class="modal fade" id="modalDetalhesFinanceiro" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header">
                 <h5 class="modal-title" id="tituloModalFinanceiro">Detalhes</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-light">
+                    <table class="table data-table mb-0">
+                        <thead>
                             <tr>
                                 <th>Data</th>
                                 <th>Veículo</th>
                                 <th>Cliente</th>
-                                <th>Valor Ganho</th>
+                                <th class="text-end">Valor</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaFinanceiroBody">
@@ -377,21 +432,21 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="text-end mt-3">
-                    <h4 class="text-success fw-bold" id="totalModalFinanceiro">Total: R$ 0,00</h4>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <span class="modal-total" id="totalModalFinanceiro">Total: R$ 0,00</span>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Script do Bootstrap (Obrigatório para o Modal) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script type="module" src="app.js?v=7"></script>
+<!-- Avisos rápidos (toasts) -->
+<div id="toastArea" class="toast-area" aria-live="polite"></div>
 
-<!-- Div do Recibo (Oculta na tela, visível apenas na impressão) -->
-<div id="reciboImpressao" class="d-none d-print-block">
-    <!-- O Javascript vai montar a nota fiscal inteira aqui dentro -->
-</div>
+<!-- Recibo (oculto na tela, visível apenas na impressão) -->
+<div id="reciboImpressao" class="d-none d-print-block"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="app.js?v=8"></script>
 </body>
 </html>

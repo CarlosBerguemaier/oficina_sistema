@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { Assistente } from "./assistente.js?v=7";
+import { Assistente } from "./assistente.js?v=8";
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE (Cole as suas chaves aqui)
 // ==========================================
@@ -16,6 +16,34 @@ import { Assistente } from "./assistente.js?v=7";
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getFirestore(appFirebase);
+
+// ==========================================
+// FUNÇÕES AUXILIARES DE TELA
+// ==========================================
+// Formata número como dinheiro: 1234.5 -> "R$ 1.234,50"
+function formatarMoeda(valor) {
+    return (Number(valor) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Protege textos vindos do banco antes de colocar no HTML
+function esc(texto) {
+    return String(texto ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Aviso rápido no topo da tela (substitui o alert do navegador)
+function mostrarToast(mensagem, tipo = "sucesso") {
+    const area = document.getElementById("toastArea");
+    const icones = { sucesso: "bi-check-circle-fill", erro: "bi-exclamation-octagon-fill", info: "bi-info-circle-fill" };
+    const toast = document.createElement("div");
+    toast.className = `app-toast ${tipo}`;
+    toast.innerHTML = `<i class="bi ${icones[tipo] || icones.info}"></i><span></span>`;
+    toast.querySelector("span").textContent = mensagem;
+    area.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add("saindo");
+        setTimeout(() => toast.remove(), 300);
+    }, 3200);
+}
 
 // ==========================================
 // 2. MEGA BANCO DE DADOS LOCAL (Cascata)
@@ -369,7 +397,7 @@ setarDataAtual() {
         this.formOS.classList.remove("d-none");
         
         if (veiculoExiste) {
-            this.alertaBusca.innerHTML = `<span class="text-success fw-bold">Veículo encontrado!</span>`;
+            this.alertaBusca.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Veículo encontrado</span>`;
             this.inputNome.value = dadosVeiculo.nomeCliente || ""; 
             
             // Preenche a MARCA
@@ -415,7 +443,7 @@ setarDataAtual() {
             this.inputAno.value = dadosVeiculo.anoCarro || "";
             this.areaHistorico.classList.remove("d-none");
         } else {
-            this.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Preencha os dados.</span>`;
+            this.alertaBusca.innerHTML = `<span class="text-primary"><i class="bi bi-plus-circle-fill"></i> Veículo novo: preencha os dados</span>`;
             this.inputNome.value = "";
             this.selectMarca.value = "";
             this.inputOutraMarca.value = "";
@@ -490,6 +518,13 @@ class App {
         document.getElementById("btnCancelar").addEventListener("click", () => {
             this.ui.limparFormulario();
             this.encerrarFilaIA();
+            // Sai do modo de edição, senão a próxima OS nova sobrescreveria a editada
+            this.osEmEdicaoId = null;
+            document.getElementById("tituloPagina").textContent = "Nova Ordem de Serviço";
+            document.querySelector("#formOS button[type='submit']").textContent = "Salvar Ordem";
+        });
+        this.ui.inputPlaca.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") this.lidarComBuscaPlaca();
         });
         document.getElementById("btnPularOSIA").addEventListener("click", () => this.carregarProximaOSIA());
 
@@ -652,7 +687,7 @@ class App {
     async lidarComBuscaPlaca() {
         const placa = this.ui.inputPlaca.value.trim();
         if (placa.length < 7) {
-            alert("Digite uma placa válida.");
+            mostrarToast("Digite uma placa válida.", "erro");
             return;
         }
 
@@ -667,7 +702,7 @@ class App {
             }
         } catch (error) {
             console.error("ERRO DETALHADO DO FIREBASE:", error);
-            alert("Erro de conexão com o banco de dados. Verifique o Console (F12).");
+            mostrarToast("Erro de conexão com o banco de dados.", "erro");
             this.ui.formOS.classList.add("d-none"); 
         } finally {
             this.ui.mostrarCarregando(false);
@@ -722,12 +757,12 @@ class App {
      try {
             if (this.osEmEdicaoId) {
                 await this.bd.atualizarOS(this.osEmEdicaoId, dadosNovaOS);
-                alert("Ordem de serviço atualizada com sucesso!");
+                mostrarToast("Ordem de serviço atualizada.");
                 this.osEmEdicaoId = null; // Reseta o estado
                 document.querySelector("#formOS button[type='submit']").textContent = "Salvar Ordem"; // Volta o texto do botão
             } else {
                 await this.bd.salvarNovaOS(dadosNovaOS);
-                alert("Ordem de serviço salva com sucesso!");
+                mostrarToast("Ordem de serviço salva.");
             }
             this.ui.limparFormulario();
             // Se a IA extraiu mais OS, abre a próxima em vez de ir para a consulta
@@ -740,7 +775,7 @@ class App {
             document.getElementById("btnAbaConsulta").click();
         } catch (error) {
             console.error(error);
-            alert("Erro ao salvar os dados.");
+            mostrarToast("Erro ao salvar os dados. Tente de novo.", "erro");
         }
     }
 
@@ -753,34 +788,30 @@ class App {
         const containerFinanceiro = document.getElementById("containerFinanceiro");
         const titulo = document.getElementById("tituloPagina");
 
-        const resetarBotoes = () => {
-            [btnNova, btnConsulta, btnFinanceiro].forEach(btn => btn.classList.replace("btn-primary", "btn-outline-primary"));
+        // Mostra uma tela e marca a aba correspondente como ativa
+        const abrirTela = (botao, container, textoTitulo) => {
+            [btnNova, btnConsulta, btnFinanceiro].forEach(btn => btn.classList.remove("active"));
             [containerNova, containerConsulta, containerFinanceiro].forEach(cont => cont.classList.add("d-none"));
+            botao.classList.add("active");
+            container.classList.remove("d-none");
+            titulo.textContent = textoTitulo;
+            window.scrollTo({ top: 0 });
         };
 
         // Alternar para tela de Nova OS
         btnNova.addEventListener("click", () => {
-            resetarBotoes();
-            containerNova.classList.remove("d-none");
-            btnNova.classList.replace("btn-outline-primary", "btn-primary");
-            titulo.textContent = "Nova Ordem de Serviço";
+            abrirTela(btnNova, containerNova, "Nova Ordem de Serviço");
         });
 
         // Alternar para tela de Consulta
         btnConsulta.addEventListener("click", () => {
-            resetarBotoes();
-            containerConsulta.classList.remove("d-none");
-            btnConsulta.classList.replace("btn-outline-primary", "btn-primary");
-            titulo.textContent = "Consultar Ordens de Serviço";
+            abrirTela(btnConsulta, containerConsulta, "Ordens de Serviço");
             this.carregarDadosIniciaisConsulta();
         });
 
         // Alternar para tela Financeira
         btnFinanceiro.addEventListener("click", async () => {
-            resetarBotoes();
-            containerFinanceiro.classList.remove("d-none");
-            btnFinanceiro.classList.replace("btn-outline-primary", "btn-primary");
-            titulo.textContent = "Resumo Financeiro";
+            abrirTela(btnFinanceiro, containerFinanceiro, "Financeiro");
             
             // Seta o mês atual no filtro se estiver vazio
             const filtroMes = document.getElementById("filtroMesFinanceiro");
@@ -798,34 +829,19 @@ class App {
             this.processarFinanceiro(e.target.value);
         });
 
-        // Eventos dos botões do Financeiro (Expandir e WhatsApp)
+        // Eventos dos botões do Financeiro (Detalhes e WhatsApp)
+        // currentTarget: o clique pode cair no ícone dentro do botão
         document.querySelectorAll(".btn-expandir-fin").forEach(btn => {
-            btn.addEventListener("click", (e) => this.abrirModalFinanceiro(e.target.dataset.tipo));
+            btn.addEventListener("click", (e) => this.abrirModalFinanceiro(e.currentTarget.dataset.tipo));
         });
         document.querySelectorAll(".btn-whats-fin").forEach(btn => {
-            btn.addEventListener("click", (e) => this.exportarWhats(e.target.dataset.tipo));
+            btn.addEventListener("click", (e) => this.exportarWhats(e.currentTarget.dataset.tipo));
         });
         document.getElementById("btnWhatsGeral").addEventListener("click", () => this.exportarWhats("geral"));
 
-        // ... MANTENHA O RESTANTE DOS EVENTOS DE CONSULTA (btnAplicarFiltros, etc) ABAIXO DESTA LINHA ...
-
-        // Alternar para tela de Nova OS
-        btnNova.addEventListener("click", () => {
-            containerNova.classList.remove("d-none");
-            containerConsulta.classList.add("d-none");
-            btnNova.classList.replace("btn-outline-primary", "btn-primary");
-            btnConsulta.classList.replace("btn-primary", "btn-outline-primary");
-            titulo.textContent = "Nova Ordem de Serviço";
-        });
-
-        // Alternar para tela de Consulta
-        btnConsulta.addEventListener("click", () => {
-            containerConsulta.classList.remove("d-none");
-            containerNova.classList.add("d-none");
-            btnConsulta.classList.replace("btn-outline-primary", "btn-primary");
-            btnNova.classList.replace("btn-primary", "btn-outline-primary");
-            titulo.textContent = "Consultar Ordens de Serviço";
-            this.carregarDadosIniciaisConsulta();
+        // Enter na busca por placa já filtra
+        document.getElementById("filtroPlaca").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") this.aplicarFiltros();
         });
 
         // Botões de Filtro e Paginação
@@ -869,7 +885,7 @@ class App {
     }
 
    async carregarDadosIniciaisConsulta() {
-        document.getElementById("tabelaOSBody").innerHTML = '<tr><td colspan="5" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Carregando informações...</td></tr>';
+        document.getElementById("tabelaOSBody").innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Carregando ordens de serviço...</div>';
         try {
             this.todasAsOS = await this.bd.buscarUltimasOS();
             
@@ -892,7 +908,7 @@ class App {
             this.paginaAtual = 1;
             this.renderizarTabelaOS();
         } catch (error) {
-            document.getElementById("tabelaOSBody").innerHTML = '<tr><td colspan="5" class="text-center py-3 text-danger">Erro ao carregar do banco de dados.</td></tr>';
+            document.getElementById("tabelaOSBody").innerHTML = '<div class="empty-state erro"><i class="bi bi-exclamation-triangle me-1"></i> Erro ao carregar do banco de dados.</div>';
         }
     }
 
@@ -926,7 +942,7 @@ class App {
         tbody.innerHTML = "";
 
         if (this.osFiltradas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted">Nenhuma ordem de serviço encontrada.</td></tr>';
+            tbody.innerHTML = '<div class="empty-state"><i class="bi bi-inbox d-block fs-3 mb-2"></i>Nenhuma ordem de serviço encontrada.</div>';
             document.getElementById("textoPaginacao").textContent = "Página 1 de 1";
             document.getElementById("btnPaginaAnterior").disabled = true;
             document.getElementById("btnPaginaProxima").disabled = true;
@@ -958,30 +974,34 @@ class App {
                 if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
             }
 
-            // Linha de Cabeçalho da Data
-            const trData = document.createElement("tr");
-            trData.className = "table-secondary";
-            trData.innerHTML = `<td colspan="5" class="fw-bold text-center text-dark">📅 ${dataExibicao}</td>`;
-            tbody.appendChild(trData);
+            // Cabeçalho do grupo de data
+            const cabecalhoData = document.createElement("div");
+            cabecalhoData.className = "os-group-date";
+            cabecalhoData.textContent = dataExibicao;
+            tbody.appendChild(cabecalhoData);
 
-            // Linhas das OS
+            // Cartões das OS (o cartão inteiro abre os detalhes)
             gruposPorData[dataBase].forEach(os => {
-                const tr = document.createElement("tr");
-                
-                // Encurta a descrição para não quebrar o layout
-                let descCurta = os.descricao || '';
-                if (descCurta.length > 30) descCurta = descCurta.substring(0, 30) + '...';
-
-                tr.innerHTML = `
-                    <td class="text-center align-middle">
-                        <button class="btn btn-sm btn-outline-primary border-0 fs-5 btn-ver-os p-1" data-id="${os.id}" title="Ver Detalhes">👁️</button>
-                    </td>
-                    <td class="align-middle lh-sm"><strong>${os.placa || '-'}</strong><br><small class="text-muted">${os.marcaCarro || '-'} ${os.modeloCarro || '-'}</small></td>
-                    <td class="align-middle text-muted" style="max-width: 200px;">${descCurta}</td>
-                    <td class="align-middle">${os.nomeCliente || '-'}</td>
-                    <td class="text-success fw-bold align-middle">R$ ${(os.valorTotal || 0).toFixed(2)}</td>
+                const cartao = document.createElement("button");
+                cartao.type = "button";
+                cartao.className = "os-card btn-ver-os";
+                cartao.dataset.id = os.id;
+                const veiculo = [os.marcaCarro, os.modeloCarro].filter(Boolean).join(" ") || "Veículo";
+                cartao.innerHTML = `
+                    <div class="os-card-main">
+                        <div class="os-card-top">
+                            <span class="placa-tag">${esc(os.placa || '-')}</span>
+                            <span class="os-card-car">${esc(veiculo)}</span>
+                        </div>
+                        <div class="os-card-desc">${esc(os.descricao || 'Sem descrição')}</div>
+                        <div class="os-card-client"><i class="bi bi-person"></i> ${esc(os.nomeCliente || '-')}</div>
+                    </div>
+                    <div class="os-card-value">
+                        ${formatarMoeda(os.valorTotal)}
+                        <i class="bi bi-chevron-right"></i>
+                    </div>
                 `;
-                tbody.appendChild(tr);
+                tbody.appendChild(cartao);
             });
         });
 
@@ -1004,45 +1024,46 @@ abrirModalDetalhes(id) {
             if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
         }
 
-          let repassesExtrasHTML = '';
-        if (os.outrosRepasses && os.outrosRepasses.length > 0) {
-            repassesExtrasHTML = '<div class="col-12 mt-2 text-end"><strong>Outros Gastos/Repasses:</strong><ul class="list-unstyled mb-0 text-muted small">';
-            os.outrosRepasses.forEach(rep => {
-                repassesExtrasHTML += `<li>${rep.descricao}: R$ ${(rep.valor || 0).toFixed(2)}</li>`;
-            });
-            repassesExtrasHTML += '</ul></div>';
-        }
-
-        // Insira ${repassesExtrasHTML} na sua string literal (conteudo) logo após os repasses fixos.
-
         let kmValor = os.quilometragem || os.kmEntrada || '';
         let kmFormatado = kmValor ? parseInt(kmValor).toLocaleString('pt-BR') + ' km' : '-';
-        
+
+        // Composição do valor: mão de obra, gastos e repasses
+        const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
+        const maoDeObra = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((os.valorTotal || 0) - gastosOS);
+        const linhasGastos = (os.outrosRepasses || []).map(rep =>
+            `<div class="sub"><span>${esc(rep.descricao || 'Gasto')}</span><span>${formatarMoeda(rep.valor)}</span></div>`
+        ).join('');
+        const linhasRepasses = [
+            os.comissao?.carlos ? `<div class="sub"><span>Repasse Carlos</span><span>${formatarMoeda(os.comissao.carlos)}</span></div>` : '',
+            os.comissao?.ratinho ? `<div class="sub"><span>Repasse Ratinho</span><span>${formatarMoeda(os.comissao.ratinho)}</span></div>` : ''
+        ].join('');
+
+        const veiculo = [os.marcaCarro, os.modeloCarro, os.litragemCarro].filter(Boolean).join(" ") || "Veículo";
+
         const conteudo = `
-            <div class="row">
-                <div class="col-md-6 mb-3"><strong>Placa:</strong> ${os.placa || '-'}</div>
-                <div class="col-md-6 mb-3"><strong>Cliente:</strong> ${os.nomeCliente || '-'}</div>
-                <div class="col-md-6 mb-3"><strong>Veículo:</strong> ${os.marcaCarro} ${os.modeloCarro} (${os.litragemCarro})</div>
-                <div class="col-md-6 mb-3"><strong>Ano:</strong> ${os.anoCarro || '-'}</div>
-                <div class="col-md-6 mb-3"><strong>Data da OS:</strong> ${dataExibicao}</div>
-                <div class="col-md-6 mb-3"><strong>Quilometragem:</strong> ${kmFormatado}</div>
-            </div>
-            <hr>
-            <div class="mb-3">
-                <strong>Descrição do Serviço:</strong><br>
-                <div class="p-2 bg-light border rounded mt-1" style="white-space: pre-wrap;">${os.descricao || 'Sem descrição.'}</div>
-            </div>
-            <hr>
-            <div class="row text-end">
-                <div class="col-12 text-success fs-5"><strong>Valor Total:</strong> R$ ${(os.valorTotal || 0).toFixed(2)}</div>
-                <div class="col-12 text-muted small">
-                    Repasse Carlos: R$ ${(os.comissao?.carlos || 0).toFixed(2)} | Repasse Ratinho: R$ ${(os.comissao?.ratinho || 0).toFixed(2)} ${repassesExtrasHTML}
+            <div class="detail-head">
+                <div>
+                    <div class="detail-car">${esc(veiculo)}</div>
+                    <div class="text-secondary small">${esc(os.nomeCliente || '-')}</div>
                 </div>
-                
+                <span class="placa-tag fs-6">${esc(os.placa || '-')}</span>
+            </div>
+            <div class="detail-grid">
+                <div class="detail-item"><span>Data</span><strong>${dataExibicao}</strong></div>
+                <div class="detail-item"><span>Quilometragem</span><strong>${kmFormatado}</strong></div>
+                <div class="detail-item"><span>Ano</span><strong>${esc(os.anoCarro || '-')}</strong></div>
+            </div>
+            <div class="subsection-label">Serviço realizado</div>
+            <div class="detail-desc">${esc(os.descricao || 'Sem descrição.')}</div>
+            <div class="subsection-label">Valores</div>
+            <div class="detail-values">
+                <div><span>Mão de obra</span><span>${formatarMoeda(maoDeObra)}</span></div>
+                ${linhasRepasses}
+                ${gastosOS > 0 ? `<div><span>Peças e gastos</span><span>${formatarMoeda(gastosOS)}</span></div>${linhasGastos}` : ''}
+                <div class="total"><span>Total</span><span>${formatarMoeda(os.valorTotal)}</span></div>
             </div>
         `;
 
-      
         document.getElementById("conteudoDetalhesOS").innerHTML = conteudo;
         const modal = new bootstrap.Modal(document.getElementById("modalDetalhesOS"));
         modal.show();
@@ -1165,7 +1186,7 @@ abrirModalDetalhes(id) {
         this.ui.mostrarFormulario(true, veiculo);
         if (!cadastro) {
             this.ui.areaHistorico.classList.add("d-none");
-            this.ui.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Confira os dados.</span>`;
+            this.ui.alertaBusca.innerHTML = `<span class="text-primary"><i class="bi bi-plus-circle-fill"></i> Veículo novo: confira os dados</span>`;
         }
 
         this.preencherCamposServico({
@@ -1203,7 +1224,7 @@ abrirModalDetalhes(id) {
         if (confirm(`Tem certeza que deseja EXCLUIR permanentemente a OS do veículo ${os.placa}?`)) {
             try {
                 await this.bd.excluirOS(os.id);
-                alert("Ordem de serviço excluída com sucesso.");
+                mostrarToast("Ordem de serviço excluída.");
                 
                 // Fecha modal
                 const modalEl = document.getElementById('modalDetalhesOS');
@@ -1213,7 +1234,7 @@ abrirModalDetalhes(id) {
                 // Recarrega a lista
                 this.carregarDadosIniciaisConsulta();
             } catch (error) {
-                alert("Erro ao tentar excluir a ordem de serviço.");
+                mostrarToast("Erro ao excluir a ordem de serviço.", "erro");
             }
         }
     }
@@ -1282,13 +1303,19 @@ abrirModalDetalhes(id) {
         });
 
         // Atualiza a tela
-        document.getElementById("totalOficina").textContent = `R$ ${this.totaisFinanceiros.oficina.toFixed(2).replace('.', ',')}`;
-        document.getElementById("totalCarlos").textContent = `R$ ${this.totaisFinanceiros.carlos.toFixed(2).replace('.', ',')}`;
-        document.getElementById("totalRatinho").textContent = `R$ ${this.totaisFinanceiros.ratinho.toFixed(2).replace('.', ',')}`;
+        document.getElementById("totalOficina").textContent = formatarMoeda(this.totaisFinanceiros.oficina);
+        document.getElementById("totalCarlos").textContent = formatarMoeda(this.totaisFinanceiros.carlos);
+        document.getElementById("totalRatinho").textContent = formatarMoeda(this.totaisFinanceiros.ratinho);
+
+        // Indicadores do mês
+        const faturado = osDoMes.reduce((acc, os) => acc + (os.valorTotal || 0), 0);
+        document.getElementById("totalFaturado").textContent = formatarMoeda(faturado);
+        document.getElementById("qtdOS").textContent = osDoMes.length;
+        document.getElementById("totalGastos").textContent = formatarMoeda(this.totaisFinanceiros.gastos);
     }
 
     abrirModalFinanceiro(tipo) {
-        const titulos = { oficina: "Detalhes: Caixa da Oficina (Líquido)", carlos: "Detalhes: Serviços Carlos", ratinho: "Detalhes: Serviços Ratinho" };
+        const titulos = { oficina: "Oficina (líquido)", carlos: "Repasses do Carlos", ratinho: "Repasses do Ratinho" };
         document.getElementById("tituloModalFinanceiro").textContent = titulos[tipo];
         
         const tbody = document.getElementById("tabelaFinanceiroBody");
@@ -1297,21 +1324,19 @@ abrirModalDetalhes(id) {
         const lista = this.dadosFinanceirosAtuais[tipo];
         
         if (lista.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum serviço registrado neste mês.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-secondary py-4">Nenhum serviço registrado neste mês.</td></tr>';
         } else {
-            lista.forEach(item => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${item.data}</td>
-                        <td>${item.veiculo}</td>
-                        <td>${item.cliente}</td>
-                        <td class="text-success fw-bold">R$ ${item.valor.toFixed(2).replace('.', ',')}</td>
-                    </tr>
-                `;
-            });
+            tbody.innerHTML = lista.map(item => `
+                <tr>
+                    <td class="text-nowrap">${esc(item.data)}</td>
+                    <td>${esc(item.veiculo)}</td>
+                    <td>${esc(item.cliente || '-')}</td>
+                    <td class="text-end text-nowrap fw-semibold">${formatarMoeda(item.valor)}</td>
+                </tr>
+            `).join('');
         }
-        
-        document.getElementById("totalModalFinanceiro").textContent = `Total: R$ ${this.totaisFinanceiros[tipo].toFixed(2).replace('.', ',')}`;
+
+        document.getElementById("totalModalFinanceiro").textContent = `Total: ${formatarMoeda(this.totaisFinanceiros[tipo])}`;
         
         const modal = new bootstrap.Modal(document.getElementById("modalDetalhesFinanceiro"));
         modal.show();

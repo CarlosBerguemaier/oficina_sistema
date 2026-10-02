@@ -1,5 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";// ==========================================
+import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { Assistente } from "./assistente.js";
+// ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE (Cole as suas chaves aqui)
 // ==========================================
   const firebaseConfig = {
@@ -469,9 +471,14 @@ class App {
         this.dadosFinanceirosAtuais = { oficina: [], carlos: [], ratinho: [], gastos: [] };
         this.totaisFinanceiros = { oficina: 0, carlos: 0, ratinho: 0, gastos: 0 };
         
+        this.filaIA = []; // OS extraídas pela IA esperando para serem conferidas
+        this.totalFilaIA = 0;
+
         this.inicializarEventosConsulta();
-        
+
         this.inicializarEventos();
+
+        this.assistente = new Assistente(frotaBrasil, (ordens) => this.receberOrdensIA(ordens));
         
         // Aquecimento silencioso da conexão
         this.bd.buscarVeiculoPorPlaca("AQUECIMENTO").catch(() => {});
@@ -480,7 +487,11 @@ class App {
     inicializarEventos() {
         document.getElementById("btnBuscarPlaca").addEventListener("click", () => this.lidarComBuscaPlaca());
         document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
-        document.getElementById("btnCancelar").addEventListener("click", () => this.ui.limparFormulario());
+        document.getElementById("btnCancelar").addEventListener("click", () => {
+            this.ui.limparFormulario();
+            this.encerrarFilaIA();
+        });
+        document.getElementById("btnPularOSIA").addEventListener("click", () => this.carregarProximaOSIA());
 
         // Mudança na MARCA
         this.ui.selectMarca.addEventListener("change", (e) => {
@@ -719,6 +730,12 @@ class App {
                 alert("Ordem de serviço salva com sucesso!");
             }
             this.ui.limparFormulario();
+            // Se a IA extraiu mais OS, abre a próxima em vez de ir para a consulta
+            if (this.filaIA.length > 0) {
+                this.carregarProximaOSIA();
+                return;
+            }
+            this.encerrarFilaIA();
             // Volta para a tela de consulta e recarrega para ver a alteração
             document.getElementById("btnAbaConsulta").click();
         } catch (error) {
@@ -1050,8 +1067,11 @@ abrirModalDetalhes(id) {
         // Preenche o formulário
         this.ui.inputPlaca.value = os.placa;
         this.ui.mostrarFormulario(true, os); // Reutiliza a lógica para preencher veículo
-        
-        // Preenche os dados específicos da OS
+        this.preencherCamposServico(os);
+    }
+
+    // Preenche data, km, descrição e valores da OS (usado na edição e pela IA)
+    preencherCamposServico(os) {
         document.getElementById("dataOS").value = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : ''); // <-- ADICIONE ESTA LINHA 
         let kmOriginal = os.quilometragem || os.kmEntrada || '';
         document.getElementById("quilometragem").value = kmOriginal ? parseInt(kmOriginal).toLocaleString('pt-BR') : '';
@@ -1078,9 +1098,12 @@ abrirModalDetalhes(id) {
                 const row = document.createElement("div");
                 row.className = "row repasse-item mb-2";
                 row.innerHTML = `
-                    <div class="col-8"><input type="text" class="form-control repasse-desc" value="${rep.descricao}"></div>
-                    <div class="col-4"><input type="number" step="0.01" class="form-control repasse-valor" value="${rep.valor}"></div>
+                    <div class="col-8"><input type="text" class="form-control repasse-desc"></div>
+                    <div class="col-4"><input type="number" step="0.01" class="form-control repasse-valor"></div>
                 `;
+                // Atribui via .value para aspas na descrição não quebrarem o HTML
+                row.querySelector(".repasse-desc").value = rep.descricao || '';
+                row.querySelector(".repasse-valor").value = rep.valor ?? '';
                 containerRepasses.appendChild(row);
             });
         }
@@ -1092,6 +1115,87 @@ abrirModalDetalhes(id) {
             <div class="col-4"><input type="number" step="0.01" class="form-control repasse-valor" placeholder="R$ 0.00"></div>
         `;
         containerRepasses.appendChild(blankRow);
+    }
+
+    // ==========================================
+    // OS EXTRAÍDAS PELA IA (Ditado / Foto)
+    // ==========================================
+    receberOrdensIA(ordens) {
+        this.filaIA = [...ordens];
+        this.totalFilaIA = ordens.length;
+        this.carregarProximaOSIA();
+    }
+
+    async carregarProximaOSIA() {
+        const ordem = this.filaIA.shift();
+        if (!ordem) {
+            this.ui.limparFormulario();
+            this.encerrarFilaIA();
+            return;
+        }
+
+        // Garante que está na aba Nova OS e fora do modo de edição
+        document.getElementById("btnAbaNovaOS").click();
+        this.osEmEdicaoId = null;
+        document.querySelector("#formOS button[type='submit']").textContent = "Salvar Ordem";
+        this.ui.limparFormulario();
+
+        const placa = (ordem.placa || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+        this.ui.inputPlaca.value = placa;
+
+        // Se o carro já está cadastrado, completa o que a IA não pegou
+        // (tenta também com traço, caso a placa tenha sido salva como ABC-1234)
+        let cadastro = null;
+        if (placa.length >= 7) {
+            try {
+                cadastro = await this.bd.buscarVeiculoPorPlaca(placa)
+                    || await this.bd.buscarVeiculoPorPlaca(`${placa.slice(0, 3)}-${placa.slice(3)}`);
+            } catch (error) {
+                console.error("Erro ao buscar placa:", error);
+            }
+        }
+        if (cadastro) this.ui.inputPlaca.value = cadastro.placa;
+        const veiculo = {
+            nomeCliente: ordem.nomeCliente || cadastro?.nomeCliente || "",
+            marcaCarro: ordem.marca || cadastro?.marcaCarro || "",
+            modeloCarro: ordem.modelo || cadastro?.modeloCarro || "",
+            litragemCarro: ordem.motor || cadastro?.litragemCarro || "",
+            anoCarro: ordem.ano || cadastro?.anoCarro || ""
+        };
+        this.ui.mostrarFormulario(true, veiculo);
+        if (!cadastro) {
+            this.ui.areaHistorico.classList.add("d-none");
+            this.ui.alertaBusca.innerHTML = `<span class="text-primary fw-bold">Veículo novo. Confira os dados.</span>`;
+        }
+
+        this.preencherCamposServico({
+            data: ordem.data || document.getElementById("dataOS").value,
+            quilometragem: ordem.quilometragem,
+            descricao: ordem.descricao,
+            valorMaoDeObra: ordem.valorMaoDeObra || '',
+            comissao: { carlos: ordem.repasseCarlos, ratinho: ordem.repasseRatinho },
+            outrosRepasses: ordem.outrosGastos
+        });
+
+        // Mostra o aviso para conferir
+        const numero = this.totalFilaIA - this.filaIA.length;
+        document.getElementById("textoFilaIA").textContent = this.totalFilaIA > 1
+            ? `OS ${numero} de ${this.totalFilaIA} preenchida pela IA. Confira tudo antes de salvar.`
+            : "OS preenchida pela IA. Confira tudo antes de salvar.";
+        const avisos = [];
+        if (placa.length < 7) avisos.push("Placa não identificada: digite a placa.");
+        if (ordem.observacoes) avisos.push(ordem.observacoes);
+        document.getElementById("observacoesIA").textContent = avisos.join(" ");
+        document.getElementById("btnPularOSIA").classList.toggle("d-none", this.totalFilaIA <= 1);
+        const aviso = document.getElementById("avisoFilaIA");
+        aviso.classList.remove("d-none");
+        aviso.scrollIntoView({ behavior: "smooth" });
+    }
+
+    encerrarFilaIA() {
+        this.filaIA = [];
+        this.totalFilaIA = 0;
+        document.getElementById("avisoFilaIA").classList.add("d-none");
     }
 
     async confirmarExclusaoOS() {

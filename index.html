@@ -36,6 +36,31 @@
     <!-- Container da Nova OS -->
     <div id="containerNovaOS">
 
+    <!-- Assistente de IA: Ditado e Foto do caderno -->
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold">Preencher automático</span>
+                <button type="button" id="btnConfigIA" class="btn btn-sm btn-outline-secondary" title="Configurar chave da IA">⚙️</button>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" id="btnDitarOS" class="btn btn-outline-primary btn-lg w-50">🎤 Ditar OS</button>
+                <button type="button" id="btnFotoCaderno" class="btn btn-outline-primary btn-lg w-50">📷 Foto do caderno</button>
+            </div>
+            <input type="file" id="inputFotoCaderno" accept="image/*" multiple class="d-none">
+
+            <div id="painelDitado" class="d-none mt-3">
+                <textarea id="textoDitado" class="form-control mb-2" rows="5" placeholder="Ex: Placa ABC1234, Gol do João, 1.6 2015, 98 mil 560 km, troca de óleo e filtro, mão de obra 150, óleo 80, Ratinho 40"></textarea>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnMicrofone" class="btn btn-outline-danger w-50">🎤 Gravar</button>
+                    <button type="button" id="btnOrganizarDitado" class="btn btn-primary w-50">✨ Preencher</button>
+                </div>
+                <button type="button" id="btnFecharDitado" class="btn btn-link btn-sm text-muted w-100 mt-1">Fechar</button>
+            </div>
+            <div id="statusAssistente" class="mt-2"></div>
+        </div>
+    </div>
+
     <!-- Seção 1: Busca pela Placa -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
@@ -46,6 +71,13 @@
             </div>
             <div id="alertaBusca" class="mt-2"></div>
         </div>
+    </div>
+
+    <!-- Aviso das OS preenchidas pela IA (fila) -->
+    <div id="avisoFilaIA" class="d-none alert alert-warning">
+        <div class="fw-bold" id="textoFilaIA"></div>
+        <div id="observacoesIA" class="small mt-1"></div>
+        <button type="button" id="btnPularOSIA" class="btn btn-sm btn-outline-dark mt-2">Pular esta OS</button>
     </div>
 
     <!-- Seção 2: Formulário da OS (Escondido até a busca) -->

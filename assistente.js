@@ -191,8 +191,10 @@ export class Assistente {
         }
     }
 
+    // Envia a chave como "Authorization: Bearer", o jeito principal da documentação.
+    // (o cabeçalho antigo x-api-key recusa as chaves pessoais sk-ant-usr-)
     criarCliente(Anthropic, chave) {
-        return new Anthropic({ apiKey: chave, dangerouslyAllowBrowser: true });
+        return new Anthropic({ apiKey: null, authToken: chave, dangerouslyAllowBrowser: true });
     }
 
     mostrarStatus(mensagem, tipo = "info") {

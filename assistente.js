@@ -18,7 +18,7 @@ const ESQUEMA_OS = {
             items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["placa", "nomeCliente", "marca", "modelo", "motor", "ano", "data", "quilometragem", "descricao", "valorMaoDeObra", "repasseCarlos", "repasseRatinho", "outrosGastos", "observacoes"],
+                required: ["placa", "nomeCliente", "marca", "modelo", "motor", "ano", "data", "quilometragem", "descricao", "valorMaoDeObra", "repasses", "outrosGastos", "observacoes"],
                 properties: {
                     placa: { type: "string" },
                     nomeCliente: { type: "string" },
@@ -30,8 +30,18 @@ const ESQUEMA_OS = {
                     quilometragem: { type: "integer" },
                     descricao: { type: "string" },
                     valorMaoDeObra: { type: "number" },
-                    repasseCarlos: { type: "number" },
-                    repasseRatinho: { type: "number" },
+                    repasses: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            additionalProperties: false,
+                            required: ["funcionario", "valor"],
+                            properties: {
+                                funcionario: { type: "string" },
+                                valor: { type: "number" }
+                            }
+                        }
+                    },
                     outrosGastos: {
                         type: "array",
                         items: {
@@ -51,7 +61,7 @@ const ESQUEMA_OS = {
     }
 };
 
-function montarInstrucoes(frotaBrasil) {
+function montarInstrucoes(frotaBrasil, funcionarios) {
     const hoje = new Date();
     const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
     const diaSemana = hoje.toLocaleDateString("pt-BR", { weekday: "long" });
@@ -66,7 +76,7 @@ Regras:
 - quilometragem: número inteiro ("98 mil 560" -> 98560). Se não souber, 0.
 - ano: ano do carro com 4 dígitos. Se não souber, 0.
 - valorMaoDeObra: valor cobrado pelo serviço (mão de obra).
-- repasseCarlos e repasseRatinho: quanto vai para o Carlos e para o Ratinho (comissão). 0 se não for dito.
+- repasses: quanto vai para cada funcionário (comissão), um item por funcionário. Em "funcionario" use EXATAMENTE um nome desta lista: ${funcionarios.length ? funcionarios.join(", ") : "(nenhum cadastrado)"}. Se for dito um nome que não está na lista, escreva como foi dito. Lista vazia se não houver repasse.
 - outrosGastos: peças, óleo, retífica e outros gastos com valor, cada um em um item.
 - descricao: o que foi feito no carro, escrito de forma clara e curta.
 - Campos de texto desconhecidos ficam "" e números desconhecidos ficam 0. Nunca invente dados.
@@ -118,9 +128,10 @@ function lerOrdensDaResposta(resposta) {
 }
 
 export class Assistente {
-    constructor(frotaBrasil, aoExtrairOrdens) {
+    constructor(frotaBrasil, aoExtrairOrdens, obterFuncionarios = () => []) {
         this.frotaBrasil = frotaBrasil;
         this.aoExtrairOrdens = aoExtrairOrdens;
+        this.obterFuncionarios = obterFuncionarios;
         this.reconhecimento = null;
         this.gravando = false;
 
@@ -339,7 +350,7 @@ export class Assistente {
                     effort: "medium",
                     format: { type: "json_schema", schema: ESQUEMA_OS }
                 },
-                system: montarInstrucoes(this.frotaBrasil),
+                system: montarInstrucoes(this.frotaBrasil, this.obterFuncionarios()),
                 messages: [{ role: "user", content: conteudo }]
             });
 

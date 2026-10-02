@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { Assistente } from "./assistente.js?v=8";
+import { Assistente } from "./assistente.js?v=9";
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE (Cole as suas chaves aqui)
 // ==========================================
@@ -28,6 +28,14 @@ function formatarMoeda(valor) {
 // Protege textos vindos do banco antes de colocar no HTML
 function esc(texto) {
     return String(texto ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Cor fixa para cada funcionário (a mesma em todas as telas)
+const CORES_EQUIPE = ["#2F80C9", "#E09A00", "#7B5CC4", "#1E9E8F", "#D0583A", "#5B7083", "#C2407D"];
+function corFuncionario(id) {
+    let soma = 0;
+    for (const c of id) soma += c.charCodeAt(0);
+    return CORES_EQUIPE[soma % CORES_EQUIPE.length];
 }
 
 // Aviso rápido no topo da tela (substitui o alert do navegador)
@@ -328,6 +336,33 @@ async atualizarOS(id, dadosOS) {
         }
     }
 
+    // ---------- FUNCIONÁRIOS ----------
+    // O id do funcionário é a chave usada em os.comissao (ex: { carlos: 40 }).
+    // Carlos e Ratinho usam os ids "carlos" e "ratinho" para as OS antigas continuarem valendo.
+    async listarFuncionarios() {
+        const funcRef = collection(this.db, "funcionarios");
+        let snapshot = await getDocs(funcRef);
+
+        // Primeira vez: cadastra a equipe que já existia no sistema
+        if (snapshot.empty) {
+            const agora = new Date().toISOString();
+            await setDoc(doc(this.db, "funcionarios", "carlos"), { nome: "Carlos", ativo: true, criadoEm: agora });
+            await setDoc(doc(this.db, "funcionarios", "ratinho"), { nome: "Ratinho", ativo: true, criadoEm: agora });
+            snapshot = await getDocs(funcRef);
+        }
+
+        const lista = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    }
+
+    async adicionarFuncionario(nome) {
+        await addDoc(collection(this.db, "funcionarios"), { nome, ativo: true, criadoEm: new Date().toISOString() });
+    }
+
+    async atualizarFuncionario(id, dados) {
+        await updateDoc(doc(this.db, "funcionarios", id), dados);
+    }
+
 
 }
 
@@ -496,17 +531,25 @@ class App {
         this.itensPorPagina = 10;
         this.osEmEdicaoId = null; // Guarda o ID da OS sendo editada
         this.osSelecionadaParaModal = null; // Guarda os dados da OS aberta no modal
-        this.dadosFinanceirosAtuais = { oficina: [], carlos: [], ratinho: [], gastos: [] };
-        this.totaisFinanceiros = { oficina: 0, carlos: 0, ratinho: 0, gastos: 0 };
+        this.dadosFinanceirosAtuais = { oficina: [], gastos: [], funcionarios: {} };
+        this.totaisFinanceiros = { oficina: 0, gastos: 0, funcionarios: {} };
         
         this.filaIA = []; // OS extraídas pela IA esperando para serem conferidas
         this.totalFilaIA = 0;
+        this.funcionarios = []; // Equipe carregada do banco ({ id, nome, ativo })
+        this.funcionarioEmEdicao = null;
 
         this.inicializarEventosConsulta();
 
         this.inicializarEventos();
+        this.inicializarEquipe();
+        this.carregarFuncionarios();
 
-        this.assistente = new Assistente(frotaBrasil, (ordens) => this.receberOrdensIA(ordens));
+        this.assistente = new Assistente(
+            frotaBrasil,
+            (ordens) => this.receberOrdensIA(ordens),
+            () => this.funcionarios.filter(f => f.ativo !== false).map(f => f.nome)
+        );
         
         // Aquecimento silencioso da conexão
         this.bd.buscarVeiculoPorPlaca("AQUECIMENTO").catch(() => {});
@@ -517,6 +560,7 @@ class App {
         document.getElementById("formOS").addEventListener("submit", (e) => this.lidarComSalvamento(e));
         document.getElementById("btnCancelar").addEventListener("click", () => {
             this.ui.limparFormulario();
+            this.renderizarCamposRepasse();
             this.encerrarFilaIA();
             // Sai do modo de edição, senão a próxima OS nova sobrescreveria a editada
             this.osEmEdicaoId = null;
@@ -717,8 +761,12 @@ class App {
         let modeloFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO") ? this.ui.inputOutroModelo.value.trim().toUpperCase() : this.ui.selectModelo.value;
         let litragemFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO" || this.ui.selectLitragem.value === "OUTRO") ? this.ui.inputOutraLitragem.value.trim().toUpperCase() : this.ui.selectLitragem.value;
 
-        const repasseCarlos = parseFloat(document.getElementById("repasseCarlos").value) || 0;
-        const repasseRatinho = parseFloat(document.getElementById("repasseRatinho").value) || 0;
+        // Repasses: { idDoFuncionario: valor } só para quem recebeu algo
+        const comissao = {};
+        document.querySelectorAll(".repasse-func").forEach(input => {
+            const valor = parseFloat(input.value) || 0;
+            if (valor > 0) comissao[input.dataset.id] = valor;
+        });
         const maoDeObra = parseFloat(document.getElementById("valorMaoDeObra").value) || 0;
         const valorTotalFinal = parseFloat(document.getElementById("valorGrandeTotal").value) || 0;
 
@@ -746,10 +794,7 @@ class App {
             descricao: document.getElementById("descricao").value,
             valorMaoDeObra: maoDeObra,
             valorTotal: valorTotalFinal,
-            comissao: {
-                carlos: repasseCarlos,
-                ratinho: repasseRatinho
-            },
+            comissao: comissao,
             outrosRepasses: outrosRepasses, // <--- NOVO CAMPO ADICIONADO AQUI
             dataEntrada: new Date().toISOString()
         };
@@ -765,6 +810,7 @@ class App {
                 mostrarToast("Ordem de serviço salva.");
             }
             this.ui.limparFormulario();
+            this.renderizarCamposRepasse();
             // Se a IA extraiu mais OS, abre a próxima em vez de ir para a consulta
             if (this.filaIA.length > 0) {
                 this.carregarProximaOSIA();
@@ -786,12 +832,14 @@ class App {
         const containerNova = document.getElementById("containerNovaOS");
         const containerConsulta = document.getElementById("containerConsultaOS");
         const containerFinanceiro = document.getElementById("containerFinanceiro");
+        const btnEquipe = document.getElementById("btnAbaEquipe");
+        const containerEquipe = document.getElementById("containerEquipe");
         const titulo = document.getElementById("tituloPagina");
 
         // Mostra uma tela e marca a aba correspondente como ativa
         const abrirTela = (botao, container, textoTitulo) => {
-            [btnNova, btnConsulta, btnFinanceiro].forEach(btn => btn.classList.remove("active"));
-            [containerNova, containerConsulta, containerFinanceiro].forEach(cont => cont.classList.add("d-none"));
+            [btnNova, btnConsulta, btnFinanceiro, btnEquipe].forEach(btn => btn.classList.remove("active"));
+            [containerNova, containerConsulta, containerFinanceiro, containerEquipe].forEach(cont => cont.classList.add("d-none"));
             botao.classList.add("active");
             container.classList.remove("d-none");
             titulo.textContent = textoTitulo;
@@ -829,13 +877,19 @@ class App {
             this.processarFinanceiro(e.target.value);
         });
 
-        // Eventos dos botões do Financeiro (Detalhes e WhatsApp)
-        // currentTarget: o clique pode cair no ícone dentro do botão
-        document.querySelectorAll(".btn-expandir-fin").forEach(btn => {
-            btn.addEventListener("click", (e) => this.abrirModalFinanceiro(e.currentTarget.dataset.tipo));
+        // Alternar para tela da Equipe
+        btnEquipe.addEventListener("click", () => {
+            abrirTela(btnEquipe, containerEquipe, "Equipe");
+            this.renderizarEquipe();
         });
-        document.querySelectorAll(".btn-whats-fin").forEach(btn => {
-            btn.addEventListener("click", (e) => this.exportarWhats(e.currentTarget.dataset.tipo));
+
+        // Botões dos cartões do Financeiro (Detalhes e WhatsApp).
+        // Um único ouvinte no grupo, porque os cartões dos funcionários são criados na hora.
+        document.getElementById("splitGrid").addEventListener("click", (e) => {
+            const btnDetalhes = e.target.closest(".btn-expandir-fin");
+            const btnWhats = e.target.closest(".btn-whats-fin");
+            if (btnDetalhes) this.abrirModalFinanceiro(btnDetalhes.dataset.tipo);
+            if (btnWhats) this.exportarWhats(btnWhats.dataset.tipo);
         });
         document.getElementById("btnWhatsGeral").addEventListener("click", () => this.exportarWhats("geral"));
 
@@ -1033,10 +1087,10 @@ abrirModalDetalhes(id) {
         const linhasGastos = (os.outrosRepasses || []).map(rep =>
             `<div class="sub"><span>${esc(rep.descricao || 'Gasto')}</span><span>${formatarMoeda(rep.valor)}</span></div>`
         ).join('');
-        const linhasRepasses = [
-            os.comissao?.carlos ? `<div class="sub"><span>Repasse Carlos</span><span>${formatarMoeda(os.comissao.carlos)}</span></div>` : '',
-            os.comissao?.ratinho ? `<div class="sub"><span>Repasse Ratinho</span><span>${formatarMoeda(os.comissao.ratinho)}</span></div>` : ''
-        ].join('');
+        const linhasRepasses = Object.entries(os.comissao || {})
+            .filter(([, valor]) => valor > 0)
+            .map(([id, valor]) => `<div class="sub"><span>Repasse ${esc(this.nomeFuncionario(id))}</span><span>${formatarMoeda(valor)}</span></div>`)
+            .join('');
 
         const veiculo = [os.marcaCarro, os.modeloCarro, os.litragemCarro].filter(Boolean).join(" ") || "Veículo";
 
@@ -1107,8 +1161,7 @@ abrirModalDetalhes(id) {
         setTimeout(() => {
             document.getElementById("valorMaoDeObra").dispatchEvent(new Event("input"));
         }, 100);
-        document.getElementById("repasseCarlos").value = os.comissao?.carlos || '';
-        document.getElementById("repasseRatinho").value = os.comissao?.ratinho || '';
+        this.renderizarCamposRepasse(os.comissao || {});
 
         // Limpa e preenche repasses dinâmicos
         const containerRepasses = document.getElementById("containerOutrosRepasses");
@@ -1189,12 +1242,21 @@ abrirModalDetalhes(id) {
             this.ui.alertaBusca.innerHTML = `<span class="text-primary"><i class="bi bi-plus-circle-fill"></i> Veículo novo: confira os dados</span>`;
         }
 
+        // A IA devolve o nome do funcionário; aqui vira o id usado na OS
+        const comissaoIA = {};
+        const repassesSemDono = [];
+        (ordem.repasses || []).forEach(rep => {
+            const func = this.acharFuncionarioPorNome(rep.funcionario);
+            if (func) comissaoIA[func.id] = (comissaoIA[func.id] || 0) + rep.valor;
+            else if (rep.valor > 0) repassesSemDono.push(`${rep.funcionario} (${formatarMoeda(rep.valor)})`);
+        });
+
         this.preencherCamposServico({
             data: ordem.data || document.getElementById("dataOS").value,
             quilometragem: ordem.quilometragem,
             descricao: ordem.descricao,
             valorMaoDeObra: ordem.valorMaoDeObra || '',
-            comissao: { carlos: ordem.repasseCarlos, ratinho: ordem.repasseRatinho },
+            comissao: comissaoIA,
             outrosRepasses: ordem.outrosGastos
         });
 
@@ -1205,6 +1267,7 @@ abrirModalDetalhes(id) {
             : "OS preenchida pela IA. Confira tudo antes de salvar.";
         const avisos = [];
         if (placa.length < 7) avisos.push("Placa não identificada: digite a placa.");
+        if (repassesSemDono.length) avisos.push(`Repasse para quem não está na equipe: ${repassesSemDono.join(", ")}.`);
         if (ordem.observacoes) avisos.push(ordem.observacoes);
         document.getElementById("observacoesIA").textContent = avisos.join(" ");
         document.getElementById("btnPularOSIA").classList.toggle("d-none", this.totalFilaIA <= 1);
@@ -1248,10 +1311,10 @@ abrirModalDetalhes(id) {
     async processarFinanceiro(anoMes) {
         // Busca as OS atualizadas
         this.todasAsOS = await this.bd.buscarUltimasOS();
-        
-        // Zera os dados
-        this.dadosFinanceirosAtuais = { oficina: [], carlos: [], ratinho: [], gastos: [] };
-        this.totaisFinanceiros = { oficina: 0, carlos: 0, ratinho: 0, gastos: 0 };
+
+        // Zera os dados. "funcionarios" é { idDoFuncionario: [...] } / { idDoFuncionario: total }
+        this.dadosFinanceirosAtuais = { oficina: [], gastos: [], funcionarios: {} };
+        this.totaisFinanceiros = { oficina: 0, gastos: 0, funcionarios: {} };
 
         // Filtra as OS pelo mês selecionado (formato YYYY-MM)
         const osDoMes = this.todasAsOS.filter(os => {
@@ -1261,39 +1324,33 @@ abrirModalDetalhes(id) {
 
         osDoMes.forEach(os => {
             const valorTotal = os.valorTotal || 0;
-            const comissaoCarlos = os.comissao?.carlos || 0;
-            const comissaoRatinho = os.comissao?.ratinho || 0;
-            
+            const repasses = Object.entries(os.comissao || {}).filter(([, valor]) => valor > 0);
+            const totalRepasses = repasses.reduce((acc, [, valor]) => acc + valor, 0);
+
             // Calcula gastos extras (Peças, Retífica)
             const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
-            
 
-          // O líquido da oficina é a Mão de Obra menos as comissões
+            // O líquido da oficina é a Mão de Obra menos os repasses
             // (Fazemos um fallback para não quebrar OS antigas)
             const maoDeObra = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((valorTotal || 0) - gastosOS);
-            const valorLiquidoOficina = maoDeObra - comissaoCarlos - comissaoRatinho;
+            const valorLiquidoOficina = maoDeObra - totalRepasses;
             // Formatação de data para exibição
             const dataParts = (os.data || os.dataEntrada.split('T')[0]).split('-');
             const dataStr = `${dataParts[2]}/${dataParts[1]}`;
             const descricaoVeiculo = `${os.marcaCarro} ${os.modeloCarro} (${os.placa})`;
+            const item = { data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, id: os.id };
 
             // Registra ganhos da Oficina
             if (valorLiquidoOficina > 0) {
-                this.dadosFinanceirosAtuais.oficina.push({ data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, valor: valorLiquidoOficina, id: os.id });
+                this.dadosFinanceirosAtuais.oficina.push({ ...item, valor: valorLiquidoOficina });
                 this.totaisFinanceiros.oficina += valorLiquidoOficina;
             }
 
-            // Registra ganhos do Carlos
-            if (comissaoCarlos > 0) {
-                this.dadosFinanceirosAtuais.carlos.push({ data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, valor: comissaoCarlos, id: os.id });
-                this.totaisFinanceiros.carlos += comissaoCarlos;
-            }
-
-            // Registra ganhos do Ratinho
-            if (comissaoRatinho > 0) {
-                this.dadosFinanceirosAtuais.ratinho.push({ data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, valor: comissaoRatinho, id: os.id });
-                this.totaisFinanceiros.ratinho += comissaoRatinho;
-            }
+            // Registra os ganhos de cada funcionário
+            repasses.forEach(([idFunc, valor]) => {
+                (this.dadosFinanceirosAtuais.funcionarios[idFunc] ??= []).push({ ...item, valor });
+                this.totaisFinanceiros.funcionarios[idFunc] = (this.totaisFinanceiros.funcionarios[idFunc] || 0) + valor;
+            });
 
             // Registra as despesas
             if (gastosOS > 0) {
@@ -1304,8 +1361,7 @@ abrirModalDetalhes(id) {
 
         // Atualiza a tela
         document.getElementById("totalOficina").textContent = formatarMoeda(this.totaisFinanceiros.oficina);
-        document.getElementById("totalCarlos").textContent = formatarMoeda(this.totaisFinanceiros.carlos);
-        document.getElementById("totalRatinho").textContent = formatarMoeda(this.totaisFinanceiros.ratinho);
+        this.renderizarCartoesFuncionarios();
 
         // Indicadores do mês
         const faturado = osDoMes.reduce((acc, os) => acc + (os.valorTotal || 0), 0);
@@ -1314,15 +1370,54 @@ abrirModalDetalhes(id) {
         document.getElementById("totalGastos").textContent = formatarMoeda(this.totaisFinanceiros.gastos);
     }
 
+    // Funcionários que aparecem no financeiro: os ativos e quem recebeu algo no mês
+    idsFuncionariosNoFinanceiro() {
+        const ids = this.funcionarios.filter(f => f.ativo !== false).map(f => f.id);
+        Object.keys(this.totaisFinanceiros.funcionarios || {}).forEach(id => {
+            if (!ids.includes(id)) ids.push(id);
+        });
+        return ids;
+    }
+
+    renderizarCartoesFuncionarios() {
+        const grid = document.getElementById("splitGrid");
+        grid.querySelectorAll(".split-func").forEach(card => card.remove());
+
+        this.idsFuncionariosNoFinanceiro().forEach(id => {
+            const card = document.createElement("div");
+            card.className = "split-card split-func";
+            card.style.setProperty("--split-color", corFuncionario(id));
+            card.innerHTML = `
+                <div class="split-head">
+                    <span class="split-icon"><i class="bi bi-person"></i></span>
+                    <span class="split-name">${esc(this.nomeFuncionario(id))}</span>
+                </div>
+                <div class="split-value">${formatarMoeda(this.totaisFinanceiros.funcionarios[id])}</div>
+                <div class="split-actions">
+                    <button type="button" class="btn btn-light btn-sm btn-expandir-fin" data-tipo="${esc(id)}"><i class="bi bi-list-ul"></i> Detalhes</button>
+                    <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="${esc(id)}"><i class="bi bi-whatsapp"></i> Enviar</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    // tipo é "oficina" ou o id de um funcionário
+    listaFinanceira(tipo) {
+        return tipo === "oficina" ? this.dadosFinanceirosAtuais.oficina : (this.dadosFinanceirosAtuais.funcionarios[tipo] || []);
+    }
+
+    totalFinanceiro(tipo) {
+        return tipo === "oficina" ? this.totaisFinanceiros.oficina : (this.totaisFinanceiros.funcionarios[tipo] || 0);
+    }
+
     abrirModalFinanceiro(tipo) {
-        const titulos = { oficina: "Oficina (líquido)", carlos: "Repasses do Carlos", ratinho: "Repasses do Ratinho" };
-        document.getElementById("tituloModalFinanceiro").textContent = titulos[tipo];
-        
+        const titulo = tipo === "oficina" ? "Oficina (líquido)" : `Repasses de ${this.nomeFuncionario(tipo)}`;
+        document.getElementById("tituloModalFinanceiro").textContent = titulo;
+
         const tbody = document.getElementById("tabelaFinanceiroBody");
-        tbody.innerHTML = "";
-        
-        const lista = this.dadosFinanceirosAtuais[tipo];
-        
+        const lista = this.listaFinanceira(tipo);
+
         if (lista.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-secondary py-4">Nenhum serviço registrado neste mês.</td></tr>';
         } else {
@@ -1336,8 +1431,8 @@ abrirModalDetalhes(id) {
             `).join('');
         }
 
-        document.getElementById("totalModalFinanceiro").textContent = `Total: ${formatarMoeda(this.totaisFinanceiros[tipo])}`;
-        
+        document.getElementById("totalModalFinanceiro").textContent = `Total: ${formatarMoeda(this.totalFinanceiro(tipo))}`;
+
         const modal = new bootstrap.Modal(document.getElementById("modalDetalhesFinanceiro"));
         modal.show();
     }
@@ -1347,33 +1442,195 @@ abrirModalDetalhes(id) {
         let texto = "";
 
         if (tipo === "geral") {
-            const faturamentoBruto = this.totaisFinanceiros.oficina + this.totaisFinanceiros.carlos + this.totaisFinanceiros.ratinho + this.totaisFinanceiros.gastos;
+            const totalRepasses = Object.values(this.totaisFinanceiros.funcionarios).reduce((acc, v) => acc + v, 0);
+            const faturamentoBruto = this.totaisFinanceiros.oficina + totalRepasses + this.totaisFinanceiros.gastos;
             texto = `*FECHAMENTO GERAL - OFICINA* \n*Mês de Referência:* ${mesRef}\n\n`;
             texto += `*Resumo Financeiro:*\n`;
             texto += `[+] Faturamento Bruto: R$ ${faturamentoBruto.toFixed(2)}\n`;
             texto += `[=] Oficina (Caixa Líquido): R$ ${this.totaisFinanceiros.oficina.toFixed(2)}\n`;
-            texto += `[-] Repasses Carlos: R$ ${this.totaisFinanceiros.carlos.toFixed(2)}\n`;
-            texto += `[-] Repasses Ratinho: R$ ${this.totaisFinanceiros.ratinho.toFixed(2)}\n`;
+            this.idsFuncionariosNoFinanceiro().forEach(id => {
+                texto += `[-] Repasses ${this.nomeFuncionario(id)}: R$ ${this.totalFinanceiro(id).toFixed(2)}\n`;
+            });
             texto += `[!] Gastos Extras (Peças/Etc): R$ ${this.totaisFinanceiros.gastos.toFixed(2)}\n\n`;
-            
+
             texto += `*DETALHES - CAIXA DA OFICINA:*\n`;
             this.dadosFinanceirosAtuais.oficina.forEach(i => texto += `• ${i.data} | ${i.veiculo} - R$ ${i.valor.toFixed(2)}\n`);
-            
+
             if (this.dadosFinanceirosAtuais.gastos.length > 0) {
                 texto += `\n*DETALHES - GASTOS EXTRAS:*\n`;
                 this.dadosFinanceirosAtuais.gastos.forEach(g => texto += `• ${g.veiculo} (${g.desc}) - R$ ${g.valor.toFixed(2)}\n`);
             }
         } else {
-            const nomes = { oficina: "CAIXA DA OFICINA", carlos: "CARLOS", ratinho: "RATINHO" };
-            texto = `*RESUMO DE GANHOS - ${nomes[tipo]}* \n*Mês de Referência:* ${mesRef}\n\n`;
-            this.dadosFinanceirosAtuais[tipo].forEach(item => {
+            const nome = tipo === "oficina" ? "CAIXA DA OFICINA" : this.nomeFuncionario(tipo).toUpperCase();
+            texto = `*RESUMO DE GANHOS - ${nome}* \n*Mês de Referência:* ${mesRef}\n\n`;
+            this.listaFinanceira(tipo).forEach(item => {
                 texto += `${item.data} - ${item.veiculo}\n Cliente: ${item.cliente}\n Valor: R$ ${item.valor.toFixed(2)}\n\n`;
             });
-            texto += `*VALOR TOTAL A RECEBER: R$ ${this.totaisFinanceiros[tipo].toFixed(2)}*`;
+            texto += `*VALOR TOTAL A RECEBER: R$ ${this.totalFinanceiro(tipo).toFixed(2)}*`;
         }
 
         const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
         window.open(url, '_blank');
+    }
+
+    // ==========================================
+    // EQUIPE (FUNCIONÁRIOS)
+    // ==========================================
+    inicializarEquipe() {
+        document.getElementById("btnNovoFuncionario").addEventListener("click", () => this.abrirModalFuncionario(null));
+        document.getElementById("formFuncionario").addEventListener("submit", (e) => this.salvarFuncionario(e));
+
+        const modalEl = document.getElementById("modalFuncionario");
+        modalEl.addEventListener("shown.bs.modal", () => document.getElementById("nomeFuncionario").focus());
+
+        // Botões Editar / Remover / Reativar de cada linha
+        document.getElementById("containerEquipe").addEventListener("click", (e) => {
+            const botao = e.target.closest("[data-acao]");
+            if (!botao) return;
+            const func = this.funcionarios.find(f => f.id === botao.dataset.id);
+            if (!func) return;
+            if (botao.dataset.acao === "editar") this.abrirModalFuncionario(func);
+            if (botao.dataset.acao === "remover") this.alterarSituacaoFuncionario(func, false);
+            if (botao.dataset.acao === "reativar") this.alterarSituacaoFuncionario(func, true);
+        });
+    }
+
+    async carregarFuncionarios() {
+        try {
+            this.funcionarios = await this.bd.listarFuncionarios();
+        } catch (error) {
+            console.error("Erro ao carregar funcionários:", error);
+            mostrarToast("Erro ao carregar a equipe.", "erro");
+        }
+        this.renderizarCamposRepasse();
+        this.renderizarEquipe();
+    }
+
+    nomeFuncionario(id) {
+        const func = this.funcionarios.find(f => f.id === id);
+        return func ? func.nome : id.charAt(0).toUpperCase() + id.slice(1);
+    }
+
+    // Compara nomes sem acento e sem diferença de maiúsculas ("Zé" = "ze")
+    acharFuncionarioPorNome(nome) {
+        const normalizar = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+        const alvo = normalizar(nome);
+        if (!alvo) return null;
+        const ativos = this.funcionarios.filter(f => f.ativo !== false);
+        return ativos.find(f => normalizar(f.nome) === alvo) || null;
+    }
+
+    // Campos de repasse da OS: um por funcionário ativo,
+    // mais os removidos que têm valor nesta OS (para editar OS antigas sem perder nada)
+    renderizarCamposRepasse(comissao = {}) {
+        const container = document.getElementById("containerRepassesFuncionarios");
+        const ids = this.funcionarios.filter(f => f.ativo !== false).map(f => f.id);
+        Object.entries(comissao).forEach(([id, valor]) => {
+            if (valor > 0 && !ids.includes(id)) ids.push(id);
+        });
+
+        if (ids.length === 0) {
+            container.innerHTML = '<div class="col-12"><p class="form-text mb-0">Nenhum funcionário ativo. Cadastre a equipe na aba Equipe.</p></div>';
+            return;
+        }
+
+        container.innerHTML = "";
+        ids.forEach(id => {
+            const coluna = document.createElement("div");
+            coluna.className = "col-6";
+            coluna.innerHTML = `
+                <label class="form-label"></label>
+                <div class="input-prefix">
+                    <span>R$</span>
+                    <input type="number" step="0.01" class="form-control repasse-func" placeholder="0,00">
+                </div>
+            `;
+            const input = coluna.querySelector("input");
+            input.id = `repasse-${id}`;
+            input.dataset.id = id;
+            input.value = comissao[id] || "";
+            const label = coluna.querySelector("label");
+            label.htmlFor = input.id;
+            label.textContent = this.nomeFuncionario(id);
+            container.appendChild(coluna);
+        });
+    }
+
+    renderizarEquipe() {
+        const ativos = this.funcionarios.filter(f => f.ativo !== false);
+        const inativos = this.funcionarios.filter(f => f.ativo === false);
+        document.getElementById("listaFuncionarios").innerHTML = ativos.map(f => this.linhaFuncionario(f)).join("");
+        document.getElementById("listaInativos").innerHTML = inativos.map(f => this.linhaFuncionario(f)).join("");
+        document.getElementById("blocoInativos").classList.toggle("d-none", inativos.length === 0);
+    }
+
+    linhaFuncionario(func) {
+        const iniciais = func.nome.split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+        const inativo = func.ativo === false;
+        const acoes = inativo
+            ? `<button type="button" class="btn btn-light btn-sm" data-acao="reativar" data-id="${esc(func.id)}"><i class="bi bi-arrow-counterclockwise"></i> Reativar</button>`
+            : `<button type="button" class="btn btn-light btn-square" data-acao="editar" data-id="${esc(func.id)}" title="Editar" aria-label="Editar ${esc(func.nome)}"><i class="bi bi-pencil"></i></button>
+               <button type="button" class="btn btn-light btn-square text-danger" data-acao="remover" data-id="${esc(func.id)}" title="Remover" aria-label="Remover ${esc(func.nome)}"><i class="bi bi-trash3"></i></button>`;
+        return `
+            <div class="team-row${inativo ? " inativo" : ""}">
+                <span class="avatar" style="--avatar-color: ${corFuncionario(func.id)}">${esc(iniciais)}</span>
+                <span class="team-name">${esc(func.nome)}</span>
+                <div class="team-actions">${acoes}</div>
+            </div>
+        `;
+    }
+
+    abrirModalFuncionario(func) {
+        this.funcionarioEmEdicao = func;
+        document.getElementById("tituloModalFuncionario").textContent = func ? "Editar funcionário" : "Adicionar funcionário";
+        document.getElementById("nomeFuncionario").value = func ? func.nome : "";
+        bootstrap.Modal.getOrCreateInstance(document.getElementById("modalFuncionario")).show();
+    }
+
+    async salvarFuncionario(evento) {
+        evento.preventDefault();
+        const nome = document.getElementById("nomeFuncionario").value.trim().replace(/\s+/g, " ");
+        if (!nome) return;
+
+        // Evita dois funcionários ativos com o mesmo nome (a IA e o WhatsApp usam o nome)
+        const repetido = this.acharFuncionarioPorNome(nome);
+        if (repetido && repetido.id !== this.funcionarioEmEdicao?.id) {
+            mostrarToast(`Já existe alguém chamado ${repetido.nome} na equipe.`, "erro");
+            return;
+        }
+
+        const botao = document.getElementById("btnSalvarFuncionario");
+        botao.disabled = true;
+        try {
+            if (this.funcionarioEmEdicao) {
+                await this.bd.atualizarFuncionario(this.funcionarioEmEdicao.id, { nome });
+                mostrarToast("Funcionário atualizado.");
+            } else {
+                await this.bd.adicionarFuncionario(nome);
+                mostrarToast(`${nome} foi adicionado à equipe.`);
+            }
+            bootstrap.Modal.getInstance(document.getElementById("modalFuncionario"))?.hide();
+            await this.carregarFuncionarios();
+        } catch (error) {
+            console.error("Erro ao salvar funcionário:", error);
+            mostrarToast("Erro ao salvar o funcionário.", "erro");
+        } finally {
+            botao.disabled = false;
+        }
+    }
+
+    async alterarSituacaoFuncionario(func, ativo) {
+        if (!ativo && !confirm(`Remover ${func.nome} da equipe?\n\nEle deixa de aparecer nas novas OS. Os serviços antigos continuam no histórico e no financeiro.`)) {
+            return;
+        }
+        try {
+            await this.bd.atualizarFuncionario(func.id, { ativo });
+            mostrarToast(ativo ? `${func.nome} voltou para a equipe.` : `${func.nome} foi removido da equipe.`);
+            await this.carregarFuncionarios();
+        } catch (error) {
+            console.error("Erro ao alterar funcionário:", error);
+            mostrarToast("Erro ao atualizar a equipe.", "erro");
+        }
     }
 
 

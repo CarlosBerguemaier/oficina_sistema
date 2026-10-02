@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
 
     <!-- Configurações para Tela Inicial de Celular -->
     <link rel="icon" type="image/png" href="logo.png">
@@ -53,6 +53,9 @@
         </button>
         <button type="button" id="btnAbaFinanceiro" class="nav-tab">
             <i class="bi bi-graph-up-arrow"></i><span>Financeiro</span>
+        </button>
+        <button type="button" id="btnAbaEquipe" class="nav-tab">
+            <i class="bi bi-people"></i><span>Equipe</span>
         </button>
     </div>
 </nav>
@@ -221,22 +224,8 @@
                 </div>
 
                 <div class="subsection-label">Repasses</div>
-                <div class="row g-3 mb-1">
-                    <div class="col-6">
-                        <label for="repasseCarlos" class="form-label">Carlos</label>
-                        <div class="input-prefix">
-                            <span>R$</span>
-                            <input type="number" id="repasseCarlos" step="0.01" class="form-control" placeholder="0,00">
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <label for="repasseRatinho" class="form-label">Ratinho</label>
-                        <div class="input-prefix">
-                            <span>R$</span>
-                            <input type="number" id="repasseRatinho" step="0.01" class="form-control" placeholder="0,00">
-                        </div>
-                    </div>
-                </div>
+                <!-- Um campo por funcionário ativo (gerado pelo JS a partir da Equipe) -->
+                <div id="containerRepassesFuncionarios" class="row g-3 mb-1"></div>
                 <p class="form-text mb-3">Deixe em branco se não houver repasse. O restante da mão de obra fica para a oficina.</p>
 
                 <div class="subsection-label">Peças e outros gastos</div>
@@ -342,7 +331,7 @@
         </div>
 
         <h2 class="section-title">Divisão dos ganhos</h2>
-        <div class="split-grid">
+        <div class="split-grid" id="splitGrid">
             <div class="split-card split-oficina">
                 <div class="split-head">
                     <span class="split-icon"><i class="bi bi-shop"></i></span>
@@ -354,35 +343,61 @@
                     <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="oficina"><i class="bi bi-whatsapp"></i> Enviar</button>
                 </div>
             </div>
-            <div class="split-card split-carlos">
-                <div class="split-head">
-                    <span class="split-icon"><i class="bi bi-person"></i></span>
-                    <span class="split-name">Carlos</span>
-                </div>
-                <div class="split-value" id="totalCarlos">R$ 0,00</div>
-                <div class="split-actions">
-                    <button type="button" class="btn btn-light btn-sm btn-expandir-fin" data-tipo="carlos"><i class="bi bi-list-ul"></i> Detalhes</button>
-                    <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="carlos"><i class="bi bi-whatsapp"></i> Enviar</button>
-                </div>
-            </div>
-            <div class="split-card split-ratinho">
-                <div class="split-head">
-                    <span class="split-icon"><i class="bi bi-person"></i></span>
-                    <span class="split-name">Ratinho</span>
-                </div>
-                <div class="split-value" id="totalRatinho">R$ 0,00</div>
-                <div class="split-actions">
-                    <button type="button" class="btn btn-light btn-sm btn-expandir-fin" data-tipo="ratinho"><i class="bi bi-list-ul"></i> Detalhes</button>
-                    <button type="button" class="btn btn-light btn-sm btn-whats-fin" data-tipo="ratinho"><i class="bi bi-whatsapp"></i> Enviar</button>
-                </div>
-            </div>
+            <!-- Cartões dos funcionários são gerados pelo JS -->
         </div>
 
         <button type="button" id="btnWhatsGeral" class="btn btn-whats btn-lg w-100 mt-3">
             <i class="bi bi-whatsapp"></i> Enviar fechamento do mês no WhatsApp
         </button>
     </section>
+
+    <!-- ==========================================
+         TELA: EQUIPE
+         ========================================== -->
+    <section id="containerEquipe" class="d-none">
+        <div class="panel p-0">
+            <div class="team-head">
+                <div>
+                    <h2 class="panel-title">Funcionários ativos</h2>
+                    <p class="panel-hint">Aparecem nos repasses da OS e no financeiro.</p>
+                </div>
+                <button type="button" id="btnNovoFuncionario" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Adicionar</button>
+            </div>
+            <div id="listaFuncionarios" class="team-list"></div>
+        </div>
+
+        <div id="blocoInativos" class="d-none">
+            <h2 class="section-title">Removidos</h2>
+            <div class="panel p-0">
+                <div id="listaInativos" class="team-list"></div>
+            </div>
+            <p class="form-text px-1">Removidos não aparecem em novas OS, mas os serviços antigos deles continuam no histórico e no financeiro.</p>
+        </div>
+    </section>
 </main>
+
+<!-- ==========================================
+     MODAL: ADICIONAR / EDITAR FUNCIONÁRIO
+     ========================================== -->
+<div class="modal fade" id="modalFuncionario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="formFuncionario">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalFuncionario">Adicionar funcionário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <label for="nomeFuncionario" class="form-label">Nome ou apelido</label>
+                <input type="text" id="nomeFuncionario" class="form-control" maxlength="40" required autocomplete="off">
+                <p class="form-text mb-0 mt-2">É o nome que aparece na OS, no financeiro e no WhatsApp.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btnSalvarFuncionario">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- ==========================================
      MODAL: DETALHES DA OS
@@ -447,6 +462,6 @@
 <div id="reciboImpressao" class="d-none d-print-block"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script type="module" src="app.js?v=8"></script>
+<script type="module" src="app.js?v=9"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { Assistente } from "./assistente.js?v=10";
-import { iniciarAcesso } from "./acesso.js?v=10";
+import { Assistente } from "./assistente.js?v=11";
+import { iniciarAcesso } from "./acesso.js?v=11";
 
 // Coleções que pertencem a cada oficina (usadas no backup e na importação)
 const COLECOES_DA_OFICINA = ["ordens_servico", "veiculos", "funcionarios"];
@@ -1903,7 +1903,7 @@ imprimirReciboOS() {
         if (os.outrosRepasses && os.outrosRepasses.length > 0) {
             repassesExtrasHTML = '<br><strong>PEÇAS E OUTROS:</strong><br>';
             os.outrosRepasses.forEach(rep => {
-                repassesExtrasHTML += `<div style="display: flex; justify-content: space-between;"><span>${rep.descricao}</span> <span>R$ ${(rep.valor || 0).toFixed(2).replace('.', ',')}</span></div>`;
+                repassesExtrasHTML += `<div style="display: flex; justify-content: space-between;"><span>${esc(rep.descricao)}</span> <span>R$ ${(Number(rep.valor) || 0).toFixed(2).replace('.', ',')}</span></div>`;
             });
         }
 
@@ -1917,25 +1917,25 @@ imprimirReciboOS() {
             </div>
             
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                <strong>OS Nº: ${os.id.substring(0, 8).toUpperCase()}</strong>
+                <strong>OS Nº: ${esc(os.id.substring(0, 8).toUpperCase())}</strong>
                 <strong>DATA: ${dataExibicao}</strong>
             </div>
             
             <div style="border-bottom: 1px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
-                <strong>CLIENTE:</strong> ${os.nomeCliente || '-'}<br>
-                <strong>VEÍCULO:</strong> ${os.marcaCarro} ${os.modeloCarro} (${os.litragemCarro})<br>
-                <strong>PLACA:</strong> ${os.placa || '-'} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>ANO:</strong> ${os.anoCarro || '-'}<br>
+                <strong>CLIENTE:</strong> ${esc(os.nomeCliente || '-')}<br>
+                <strong>VEÍCULO:</strong> ${esc(os.marcaCarro)} ${esc(os.modeloCarro)} (${esc(os.litragemCarro)})<br>
+                <strong>PLACA:</strong> ${esc(os.placa || '-')} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>ANO:</strong> ${esc(os.anoCarro || '-')}<br>
                 <strong>QUILOMETRAGEM:</strong> ${kmFormatado}
             </div>
 
             <div style="border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
                 <strong>MÃO DE OBRA / SERVIÇOS EXECUTADOS:</strong><br>
-                <div style="white-space: pre-wrap; margin-top: 8px;">${os.descricao || 'Sem descrição.'}</div>
+                <div style="white-space: pre-wrap; margin-top: 8px;">${esc(os.descricao || 'Sem descrição.')}</div>
                 ${repassesExtrasHTML}
             </div>
 
             <div style="text-align: right; font-size: 22px; margin-bottom: 40px;">
-                <strong>TOTAL GERAL: R$ ${(os.valorTotal || 0).toFixed(2).replace('.', ',')}</strong>
+                <strong>TOTAL GERAL: R$ ${(Number(os.valorTotal) || 0).toFixed(2).replace('.', ',')}</strong>
             </div>
 
             <div style="text-align: center; margin-top: 80px;">

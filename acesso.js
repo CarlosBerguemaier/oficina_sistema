@@ -17,7 +17,8 @@ const MENSAGENS_ERRO = {
     "auth/user-not-found": "E-mail ou senha incorretos.",
     "auth/invalid-email": "Este e-mail não é válido.",
     "auth/email-already-in-use": "Já existe uma conta com este e-mail. Tente entrar.",
-    "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
+    "auth/weak-password": "Senha fraca. Use pelo menos 8 caracteres, misturando letras e números.",
+    "auth/password-does-not-meet-requirements": "Senha fraca. Use pelo menos 8 caracteres, misturando letras e números.",
     "auth/too-many-requests": "Muitas tentativas. Espere alguns minutos e tente de novo.",
     "auth/network-request-failed": "Sem conexão com a internet.",
     "auth/operation-not-allowed": "Login por e-mail ainda não foi ativado no Firebase."
@@ -82,7 +83,7 @@ export function iniciarAcesso({ appFirebase, db, aoEntrar }) {
         e.preventDefault();
         const email = document.getElementById("loginEmail").value.trim();
         const senha = document.getElementById("loginSenha").value;
-        comCarregando(e.submitter, async () => {
+        comCarregando(e.submitter || e.target.querySelector("[type=submit]"), async () => {
             try {
                 await signInWithEmailAndPassword(auth, email, senha);
             } catch (erro) {
@@ -97,7 +98,7 @@ export function iniciarAcesso({ appFirebase, db, aoEntrar }) {
         const nome = document.getElementById("cadastroNome").value.trim();
         const email = document.getElementById("cadastroEmail").value.trim();
         const senha = document.getElementById("cadastroSenha").value;
-        comCarregando(e.submitter, async () => {
+        comCarregando(e.submitter || e.target.querySelector("[type=submit]"), async () => {
             try {
                 const { user } = await createUserWithEmailAndPassword(auth, email, senha);
                 await updateProfile(user, { displayName: nome });
@@ -114,7 +115,7 @@ export function iniciarAcesso({ appFirebase, db, aoEntrar }) {
     document.getElementById("formRecuperar").addEventListener("submit", (e) => {
         e.preventDefault();
         const email = document.getElementById("recuperarEmail").value.trim();
-        comCarregando(e.submitter, async () => {
+        comCarregando(e.submitter || e.target.querySelector("[type=submit]"), async () => {
             try {
                 await sendPasswordResetEmail(auth, email);
                 mostrarMensagem("Pronto! Se este e-mail tiver conta, chegará um link para criar uma nova senha. Veja também o spam.", "ok");
@@ -129,7 +130,7 @@ export function iniciarAcesso({ appFirebase, db, aoEntrar }) {
         e.preventDefault();
         const nomeOficina = document.getElementById("nomeOficinaNova").value.trim();
         if (!nomeOficina) return;
-        comCarregando(e.submitter, async () => {
+        comCarregando(e.submitter || e.target.querySelector("[type=submit]"), async () => {
             try {
                 const oficinaRef = doc(collection(db, "oficinas"));
                 const agora = new Date().toISOString();

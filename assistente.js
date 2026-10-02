@@ -181,7 +181,7 @@ export class Assistente {
 
     // Faz um pedido que não gasta crédito (lista os modelos) para conferir a chave
     async testarChave(chave) {
-        this.mostrarStatus('<span class="spinner-border spinner-border-sm"></span> Testando a chave...', "info");
+        this.mostrarStatus("Testando a chave...", "info", true);
         const Anthropic = await this.carregarSDK();
         if (!Anthropic) return;
         try {
@@ -196,7 +196,7 @@ export class Assistente {
 
     async carregarSDK() {
         try {
-            const { default: Anthropic } = await import("https://esm.sh/@anthropic-ai/sdk");
+            const { default: Anthropic } = await import("https://esm.sh/@anthropic-ai/sdk@0.131.0");
             return Anthropic;
         } catch (erro) {
             console.error(erro);
@@ -211,8 +211,16 @@ export class Assistente {
         return new Anthropic({ apiKey: null, authToken: chave, dangerouslyAllowBrowser: true });
     }
 
-    mostrarStatus(mensagem, tipo = "info") {
-        this.status.innerHTML = mensagem ? `<div class="alert alert-${tipo} py-2 mb-0">${mensagem}</div>` : "";
+    // A mensagem entra como texto (nunca como HTML): erros da IA e da internet podem trazer
+    // qualquer conteúdo. "carregando" acrescenta o ícone girando antes do texto.
+    mostrarStatus(mensagem, tipo = "info", carregando = false) {
+        this.status.innerHTML = "";
+        if (!mensagem) return;
+        const caixa = document.createElement("div");
+        caixa.className = `alert alert-${tipo} py-2 mb-0`;
+        if (carregando) caixa.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ';
+        caixa.append(mensagem);
+        this.status.appendChild(caixa);
     }
 
     // ---------- DITADO POR VOZ ----------
@@ -312,7 +320,7 @@ export class Assistente {
         this.inputFoto.value = "";
         if (arquivos.length === 0) return;
 
-        this.mostrarStatus('<span class="spinner-border spinner-border-sm"></span> Preparando as fotos...', "info");
+        this.mostrarStatus("Preparando as fotos...", "info", true);
         let conteudo;
         try {
             const imagens = await Promise.all(arquivos.map(a => redimensionarImagem(a)));
@@ -334,7 +342,7 @@ export class Assistente {
         if (!chave) chave = this.pedirChave();
         if (!chave) return null;
 
-        this.mostrarStatus('<span class="spinner-border spinner-border-sm"></span> A IA está organizando os dados... (pode levar alguns segundos)', "info");
+        this.mostrarStatus("A IA está organizando os dados... (pode levar alguns segundos)", "info", true);
 
         const Anthropic = await this.carregarSDK();
         if (!Anthropic) return null;
@@ -382,7 +390,7 @@ export class Assistente {
         } catch (erro) {
             console.error(erro);
             if (erro instanceof Anthropic.AuthenticationError) {
-                this.mostrarStatus(`Chave da API recusada. Toque em ⚙️ para corrigir. Detalhe: ${erro.message}`, "danger");
+                this.mostrarStatus(`Chave da API recusada. Corrija em Conta → Chave da IA. Detalhe: ${erro.message}`, "danger");
             } else if (erro instanceof Anthropic.RateLimitError) {
                 this.mostrarStatus("Muitos pedidos seguidos. Espere um minuto e tente de novo.", "warning");
             } else if (erro instanceof Anthropic.BadRequestError) {

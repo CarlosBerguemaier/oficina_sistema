@@ -78,7 +78,10 @@ service cloud.firestore {
       allow delete: if false;
 
       // Dados da oficina: OS, veículos, funcionários, etc.
-      match /{documento=**} {
+      // Atenção: "{colecao}/{documento=**}" exige pelo menos uma coleção abaixo da oficina.
+      // Um "{documento=**}" sozinho também casaria com o próprio cadastro da oficina e
+      // deixaria qualquer membro trocar o dono ou apagá-la, passando por cima das regras acima.
+      match /{colecao}/{documento=**} {
         allow read, write: if membroDe(oficinaId);
       }
     }

@@ -150,17 +150,49 @@ export class Assistente {
 
     pedirChave() {
         const atual = this.obterChave();
+        const final = atual ? `\n\nChave salva agora: termina em ...${atual.slice(-4)}` : "\n\nNenhuma chave salva ainda.";
         const chave = prompt(
-            "Cole aqui a sua chave da API da Anthropic (começa com sk-ant-).\nEla fica salva só neste aparelho.",
-            atual || ""
+            "Cole aqui a sua chave da API da Anthropic (começa com sk-ant-).\nEla fica salva só neste aparelho." + final,
+            ""
         );
-        if (chave === null) return atual;
+        // Cancelou ou deixou em branco: mantém a chave atual
+        if (chave === null || chave.trim() === "") return atual;
         try {
             localStorage.setItem(CHAVE_STORAGE, chave.trim());
         } catch {
             alert("Não foi possível salvar a chave neste navegador.");
         }
+        this.testarChave(chave.trim());
         return chave.trim();
+    }
+
+    // Faz um pedido que não gasta crédito (lista os modelos) para conferir a chave
+    async testarChave(chave) {
+        this.mostrarStatus('<span class="spinner-border spinner-border-sm"></span> Testando a chave...', "info");
+        const Anthropic = await this.carregarSDK();
+        if (!Anthropic) return;
+        try {
+            await this.criarCliente(Anthropic, chave).models.list({ limit: 1 });
+            this.mostrarStatus(`✅ Chave funcionando (termina em ...${chave.slice(-4)}).`, "success");
+        } catch (erro) {
+            console.error(erro);
+            this.mostrarStatus(`❌ A chave (termina em ...${chave.slice(-4)}) foi recusada. Erro ${erro.status ?? ""}: ${erro.message}`, "danger");
+        }
+    }
+
+    async carregarSDK() {
+        try {
+            const { default: Anthropic } = await import("https://esm.sh/@anthropic-ai/sdk");
+            return Anthropic;
+        } catch (erro) {
+            console.error(erro);
+            this.mostrarStatus("Não foi possível carregar a IA. Verifique a internet.", "danger");
+            return null;
+        }
+    }
+
+    criarCliente(Anthropic, chave) {
+        return new Anthropic({ apiKey: chave, dangerouslyAllowBrowser: true });
     }
 
     mostrarStatus(mensagem, tipo = "info") {
@@ -286,16 +318,9 @@ export class Assistente {
 
         this.mostrarStatus('<span class="spinner-border spinner-border-sm"></span> A IA está organizando os dados... (pode levar alguns segundos)', "info");
 
-        let Anthropic;
-        try {
-            ({ default: Anthropic } = await import("https://esm.sh/@anthropic-ai/sdk"));
-        } catch (erro) {
-            console.error(erro);
-            this.mostrarStatus("Não foi possível carregar a IA. Verifique a internet.", "danger");
-            return null;
-        }
-
-        const cliente = new Anthropic({ apiKey: chave, dangerouslyAllowBrowser: true });
+        const Anthropic = await this.carregarSDK();
+        if (!Anthropic) return null;
+        const cliente = this.criarCliente(Anthropic, chave);
 
         try {
             const resposta = await cliente.beta.messages.create({

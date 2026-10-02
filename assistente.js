@@ -155,10 +155,6 @@ export class Assistente {
             atual || ""
         );
         if (chave === null) return atual;
-        if (chave.trim() && !chave.trim().startsWith("sk-ant-api")) {
-            alert("Essa não parece uma chave da API: ela deve começar com sk-ant-api03-.\nGere uma em console.anthropic.com → Settings → API Keys.");
-            return null;
-        }
         try {
             localStorage.setItem(CHAVE_STORAGE, chave.trim());
         } catch {
@@ -343,7 +339,7 @@ export class Assistente {
         } catch (erro) {
             console.error(erro);
             if (erro instanceof Anthropic.AuthenticationError) {
-                this.mostrarStatus('Chave da API inválida. Toque em ⚙️ para corrigir.', "danger");
+                this.mostrarStatus(`Chave da API recusada. Toque em ⚙️ para corrigir. Detalhe: ${erro.message}`, "danger");
             } else if (erro instanceof Anthropic.RateLimitError) {
                 this.mostrarStatus("Muitos pedidos seguidos. Espere um minuto e tente de novo.", "warning");
             } else if (erro instanceof Anthropic.BadRequestError) {

@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { Assistente } from "./assistente.js?v=11";
-import { iniciarAcesso } from "./acesso.js?v=11";
+import { Assistente } from "./assistente.js?v=12";
+import { iniciarAcesso } from "./acesso.js?v=12";
 
 // Coleções que pertencem a cada oficina (usadas no backup e na importação)
 const COLECOES_DA_OFICINA = ["ordens_servico", "veiculos", "funcionarios"];
@@ -27,6 +27,20 @@ const db = getFirestore(appFirebase);
 // Formata número como dinheiro: 1234.5 -> "R$ 1.234,50"
 function formatarMoeda(valor) {
     return (Number(valor) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Número vindo do banco; qualquer coisa que não seja número vira 0
+function num(valor) {
+    const n = Number(valor);
+    return Number.isFinite(n) ? n : 0;
+}
+
+// Data da OS no formato AAAA-MM-DD, ou "" se não houver.
+// Usa a data escolhida (os.data) ou, em OS antigas, a data de entrada.
+// Aceita qualquer coisa vinda do banco sem travar a tela (número, nulo, formato errado).
+function dataDaOS(os) {
+    const bruta = os?.data || os?.dataEntrada || "";
+    return String(bruta).split("T")[0];
 }
 
 // Protege textos vindos do banco antes de colocar no HTML
@@ -1030,13 +1044,13 @@ class App {
             
             // NOVA LÓGICA DE ORDENAÇÃO: Força a lista inteira a se organizar pela data da OS escolhida
             this.todasAsOS.sort((a, b) => {
-                const dataA = a.data || (a.dataEntrada ? a.dataEntrada.split('T')[0] : '0000-00-00');
-                const dataB = b.data || (b.dataEntrada ? b.dataEntrada.split('T')[0] : '0000-00-00');
+                const dataA = (dataDaOS(a) || '0000-00-00');
+                const dataB = (dataDaOS(b) || '0000-00-00');
                 
                 // Se as datas do serviço forem iguais, desempata pela hora exata de salvamento
                 if (dataA === dataB) {
-                    const horaA = a.dataEntrada || '0000';
-                    const horaB = b.dataEntrada || '0000';
+                    const horaA = String(a.dataEntrada || '0000');
+                    const horaB = String(b.dataEntrada || '0000');
                     return horaB.localeCompare(horaA);
                 }
                 // Ordena de forma decrescente (Maior/Mais nova sempre no topo)
@@ -1062,12 +1076,12 @@ class App {
             let passa = true;
             // Valida a data nova (os.data) ou converte a data antiga (os.dataEntrada)
             if (dataBusca) {
-                const dataOsFormatada = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : null);
+                const dataOsFormatada = (dataDaOS(os) || null);
                 if (dataOsFormatada !== dataBusca) passa = false;
             }
-            if (placaBusca && (!os.placa || !os.placa.includes(placaBusca))) passa = false;
-            if (marcaBusca && (!os.marcaCarro || !os.marcaCarro.toUpperCase().includes(marcaBusca))) passa = false;
-            if (modeloBusca && (!os.modeloCarro || !os.modeloCarro.toUpperCase().includes(modeloBusca))) passa = false;
+            if (placaBusca && !String(os.placa || "").toUpperCase().includes(placaBusca)) passa = false;
+            if (marcaBusca && !String(os.marcaCarro || "").toUpperCase().includes(marcaBusca)) passa = false;
+            if (modeloBusca && !String(os.modeloCarro || "").toUpperCase().includes(modeloBusca)) passa = false;
             
             return passa;
         });
@@ -1095,7 +1109,7 @@ class App {
         // Agrupa as OS por data no formato YYYY-MM-DD para o JavaScript não perder a ordem matemática
         const gruposPorData = {};
         osPaginadas.forEach(os => {
-            const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : '0000-00-00');
+            const dataBase = (dataDaOS(os) || '0000-00-00');
             
             if (!gruposPorData[dataBase]) gruposPorData[dataBase] = [];
             gruposPorData[dataBase].push(os);
@@ -1157,7 +1171,7 @@ abrirModalDetalhes(id) {
 
         // Formata data para exibição
         let dataExibicao = "N/A";
-        const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : null);
+        const dataBase = (dataDaOS(os) || null);
         if (dataBase) {
             const partes = dataBase.split('-');
             if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
@@ -1167,9 +1181,9 @@ abrirModalDetalhes(id) {
         let kmFormatado = kmValor ? parseInt(kmValor).toLocaleString('pt-BR') + ' km' : '-';
 
         // Composição do valor: mão de obra, gastos e repasses
-        const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
+        const gastosOS = (Array.isArray(os.outrosRepasses) ? os.outrosRepasses : []).reduce((acc, rep) => acc + num(rep?.valor), 0);
         const maoDeObra = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((os.valorTotal || 0) - gastosOS);
-        const linhasGastos = (os.outrosRepasses || []).map(rep =>
+        const linhasGastos = (Array.isArray(os.outrosRepasses) ? os.outrosRepasses : []).map(rep =>
             `<div class="sub"><span>${esc(rep.descricao || 'Gasto')}</span><span>${formatarMoeda(rep.valor)}</span></div>`
         ).join('');
         const linhasRepasses = Object.entries(os.comissao || {})
@@ -1232,12 +1246,12 @@ abrirModalDetalhes(id) {
 
     // Preenche data, km, descrição e valores da OS (usado na edição e pela IA)
     preencherCamposServico(os) {
-        document.getElementById("dataOS").value = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : ''); // <-- ADICIONE ESTA LINHA 
+        document.getElementById("dataOS").value = (dataDaOS(os) || ''); // <-- ADICIONE ESTA LINHA 
         let kmOriginal = os.quilometragem || os.kmEntrada || '';
         document.getElementById("quilometragem").value = kmOriginal ? parseInt(kmOriginal).toLocaleString('pt-BR') : '';
         document.getElementById("descricao").value = os.descricao || '';
     // Cálculo retroativo: se a OS for antiga e não tiver Mão de Obra salva, ele deduz subtraindo as peças do valor total
-        const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
+        const gastosOS = (Array.isArray(os.outrosRepasses) ? os.outrosRepasses : []).reduce((acc, rep) => acc + num(rep?.valor), 0);
         const maoDeObraEdit = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((os.valorTotal || 0) - gastosOS);
         
         document.getElementById("valorMaoDeObra").value = maoDeObraEdit;
@@ -1252,7 +1266,7 @@ abrirModalDetalhes(id) {
         const containerRepasses = document.getElementById("containerOutrosRepasses");
         containerRepasses.innerHTML = '';
         
-        if (os.outrosRepasses && os.outrosRepasses.length > 0) {
+        if (Array.isArray(os.outrosRepasses) && os.outrosRepasses.length > 0) {
             os.outrosRepasses.forEach(rep => {
                 const row = document.createElement("div");
                 row.className = "row repasse-item mb-2";
@@ -1403,24 +1417,28 @@ abrirModalDetalhes(id) {
 
         // Filtra as OS pelo mês selecionado (formato YYYY-MM)
         const osDoMes = this.todasAsOS.filter(os => {
-            const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : '');
+            const dataBase = (dataDaOS(os) || '');
             return dataBase.startsWith(anoMes);
         });
 
         osDoMes.forEach(os => {
-            const valorTotal = os.valorTotal || 0;
-            const repasses = Object.entries(os.comissao || {}).filter(([, valor]) => valor > 0);
+            // num(): valores gravados errado (texto, nulo) contam como 0 em vez de travar a soma
+            const valorTotal = num(os.valorTotal);
+            const repasses = Object.entries(os.comissao || {})
+                .map(([id, valor]) => [id, num(valor)])
+                .filter(([, valor]) => valor > 0);
             const totalRepasses = repasses.reduce((acc, [, valor]) => acc + valor, 0);
 
             // Calcula gastos extras (Peças, Retífica)
-            const gastosOS = (os.outrosRepasses || []).reduce((acc, rep) => acc + (rep.valor || 0), 0);
+            const listaGastos = Array.isArray(os.outrosRepasses) ? os.outrosRepasses : [];
+            const gastosOS = listaGastos.reduce((acc, rep) => acc + num(rep?.valor), 0);
 
             // O líquido da oficina é a Mão de Obra menos os repasses
             // (Fazemos um fallback para não quebrar OS antigas)
-            const maoDeObra = os.valorMaoDeObra !== undefined ? os.valorMaoDeObra : ((valorTotal || 0) - gastosOS);
+            const maoDeObra = os.valorMaoDeObra !== undefined ? num(os.valorMaoDeObra) : (valorTotal - gastosOS);
             const valorLiquidoOficina = maoDeObra - totalRepasses;
             // Formatação de data para exibição
-            const dataParts = (os.data || os.dataEntrada.split('T')[0]).split('-');
+            const dataParts = dataDaOS(os).split('-');
             const dataStr = `${dataParts[2]}/${dataParts[1]}`;
             const descricaoVeiculo = `${os.marcaCarro} ${os.modeloCarro} (${os.placa})`;
             const item = { data: dataStr, veiculo: descricaoVeiculo, cliente: os.nomeCliente, id: os.id };
@@ -1439,7 +1457,7 @@ abrirModalDetalhes(id) {
 
             // Registra as despesas
             if (gastosOS > 0) {
-                this.dadosFinanceirosAtuais.gastos.push({ veiculo: descricaoVeiculo, valor: gastosOS, desc: os.outrosRepasses.map(r => r.descricao).join(", ") });
+                this.dadosFinanceirosAtuais.gastos.push({ veiculo: descricaoVeiculo, valor: gastosOS, desc: listaGastos.map(r => r?.descricao).join(", ") });
                 this.totaisFinanceiros.gastos += gastosOS;
             }
         });
@@ -1449,7 +1467,7 @@ abrirModalDetalhes(id) {
         this.renderizarCartoesFuncionarios();
 
         // Indicadores do mês
-        const faturado = osDoMes.reduce((acc, os) => acc + (os.valorTotal || 0), 0);
+        const faturado = osDoMes.reduce((acc, os) => acc + num(os.valorTotal), 0);
         document.getElementById("totalFaturado").textContent = formatarMoeda(faturado);
         document.getElementById("qtdOS").textContent = osDoMes.length;
         document.getElementById("totalGastos").textContent = formatarMoeda(this.totaisFinanceiros.gastos);
@@ -1888,7 +1906,7 @@ imprimirReciboOS() {
 
         // Formatação da Data
         let dataExibicao = "N/A";
-        const dataBase = os.data || (os.dataEntrada ? os.dataEntrada.split('T')[0] : null);
+        const dataBase = (dataDaOS(os) || null);
         if (dataBase) {
             const partes = dataBase.split('-');
             if (partes.length === 3) dataExibicao = `${partes[2]}/${partes[1]}/${partes[0]}`;
@@ -1900,7 +1918,7 @@ imprimirReciboOS() {
 
         // Formatação dos Gastos Extras / Peças
         let repassesExtrasHTML = '';
-        if (os.outrosRepasses && os.outrosRepasses.length > 0) {
+        if (Array.isArray(os.outrosRepasses) && os.outrosRepasses.length > 0) {
             repassesExtrasHTML = '<br><strong>PEÇAS E OUTROS:</strong><br>';
             os.outrosRepasses.forEach(rep => {
                 repassesExtrasHTML += `<div style="display: flex; justify-content: space-between;"><span>${esc(rep.descricao)}</span> <span>R$ ${(Number(rep.valor) || 0).toFixed(2).replace('.', ',')}</span></div>`;

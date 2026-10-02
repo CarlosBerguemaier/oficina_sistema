@@ -50,6 +50,8 @@ service cloud.firestore {
       //  - como membro, se existe convite para o e-mail confirmado dele
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(["oficinaId", "nome", "email", "papel", "criadoEm"])
+        // o e-mail do perfil é o e-mail real da conta (ninguém aparece com o e-mail de outra pessoa)
+        && request.resource.data.email == request.auth.token.email.lower()
         && (
           (request.resource.data.papel == "dono"
             && getAfter(/databases/$(database)/documents/oficinas/$(request.resource.data.oficinaId)).data.donoUid == request.auth.uid)
@@ -68,10 +70,13 @@ service cloud.firestore {
     match /oficinas/{oficinaId} {
       allow read: if membroDe(oficinaId);
 
-      // Só quem ainda não tem oficina pode criar uma, e vira o dono dela
+      // Só quem ainda não tem oficina pode criar uma, e vira o dono dela.
+      // A oficina tem que nascer junto com o perfil do dono (mesmo lote de gravação):
+      // sem isso, dava para criar oficinas avulsas sem limite e encher o banco de lixo.
       allow create: if logado()
         && !exists(caminhoPerfil())
-        && request.resource.data.donoUid == request.auth.uid;
+        && request.resource.data.donoUid == request.auth.uid
+        && getAfter(caminhoPerfil()).data.oficinaId == oficinaId;
 
       // O dono pode mudar dados da oficina (ex: nome), mas não trocar o dono
       allow update: if donoDe(oficinaId) && request.resource.data.donoUid == resource.data.donoUid;

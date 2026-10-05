@@ -1143,6 +1143,23 @@ body.sem-sessao {
     margin: 0;
 }
 
+/* Celular: as janelas abrem em tela cheia. Como a barra de status do iPhone é transparente
+   (app na tela inicial), o topo da janela fica embaixo do relógio e da bateria, e o rodapé
+   embaixo da barra de gestos. Reserva esse espaço, como o cabeçalho principal já faz. */
+@media (max-width: 575.98px) {
+    .modal-fullscreen-sm-down .modal-content {
+        border-radius: 0;
+    }
+
+    .modal-fullscreen-sm-down .modal-header {
+        padding-top: calc(16px + env(safe-area-inset-top));
+    }
+
+    .modal-fullscreen-sm-down .modal-footer {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+}
+
 .detail-head {
     display: flex;
     align-items: center;

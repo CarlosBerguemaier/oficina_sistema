@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, collection, addDoc, doc, setDoc, query, where, getDocs, orderBy, limit, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { Assistente } from "./assistente.js?v=12";
 import { iniciarAcesso } from "./acesso.js?v=12";
 
@@ -19,7 +19,10 @@ const COLECOES_DA_OFICINA = ["ordens_servico", "veiculos", "funcionarios"];
   };
 
 const appFirebase = initializeApp(firebaseConfig);
-const db = getFirestore(appFirebase);
+// Conexão por "long polling": a conexão contínua padrão às vezes adormece no iPhone
+// (principalmente com o app aberto pela tela inicial) e as buscas ficavam paradas até
+// outra ação mexer na conexão. O long polling é um pouco mais simples e não trava.
+const db = initializeFirestore(appFirebase, { experimentalForceLongPolling: true });
 
 // ==========================================
 // FUNÇÕES AUXILIARES DE TELA
@@ -425,39 +428,6 @@ async atualizarOS(id, dadosOS) {
         return backup;
     }
 
-    // ---------- DADOS DO SISTEMA ANTIGO ----------
-    // Antes do login, os dados ficavam na raiz do banco (sem oficina).
-    // Depois que as regras novas forem publicadas, a raiz fica bloqueada e isto devolve false.
-    async existemDadosAntigos() {
-        try {
-            const jaImportado = await getDoc(doc(this.db, "migracao", "legado"));
-            if (jaImportado.exists()) return false;
-            const amostra = await getDocs(query(collection(this.db, "ordens_servico"), limit(1)));
-            return !amostra.empty;
-        } catch {
-            return false;
-        }
-    }
-
-    // Copia as coleções antigas da raiz para dentro da oficina, mantendo os mesmos ids
-    async importarDadosAntigos(aoProgredir) {
-        const resumo = {};
-        for (const nome of COLECOES_DA_OFICINA) {
-            const snapshot = await getDocs(collection(this.db, nome));
-            resumo[nome] = snapshot.size;
-            // O Firestore aceita até 500 gravações por lote
-            for (let i = 0; i < snapshot.docs.length; i += 400) {
-                const lote = writeBatch(this.db);
-                snapshot.docs.slice(i, i + 400).forEach(d => lote.set(this.ref(nome, d.id), d.data()));
-                await lote.commit();
-                aoProgredir?.(`${nome}: ${Math.min(i + 400, snapshot.size)} de ${snapshot.size}`);
-            }
-        }
-        // Marca como importado, para nenhuma outra conta importar de novo
-        await setDoc(doc(this.db, "migracao", "legado"), { oficinaId: this.oficinaId, importadoEm: new Date().toISOString(), resumo });
-        return resumo;
-    }
-
 
 }
 
@@ -642,7 +612,6 @@ class App {
         this.inicializarEquipe();
         this.inicializarConta();
         this.carregarFuncionarios();
-        this.verificarDadosAntigos();
 
         this.assistente = new Assistente(
             frotaBrasil,
@@ -650,8 +619,9 @@ class App {
             () => this.funcionarios.filter(f => f.ativo !== false).map(f => f.nome)
         );
         
-        // Aquecimento silencioso da conexão
-        this.bd.buscarVeiculoPorPlaca("AQUECIMENTO").catch(() => {});
+        // Já pede as OS ao entrar, para a aba Consultar abrir sem espera
+        // (também "aquece" a conexão com o banco)
+        this.promessaOS = this.bd.buscarUltimasOS().catch(() => null);
     }
 
     inicializarEventos() {
@@ -855,6 +825,24 @@ class App {
     async lidarComSalvamento(evento) {
         evento.preventDefault();
 
+        // Trava contra toque duplo: enquanto salva, novos toques (ou Enter) são ignorados.
+        // Sem isso, tocar duas vezes em "Salvar" durante a espera criava a OS em dobro.
+        if (this.salvandoOS) return;
+        this.salvandoOS = true;
+        const botaoSalvar = document.querySelector("#formOS button[type='submit']");
+        botaoSalvar.disabled = true;
+        botaoSalvar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
+        try {
+            await this.salvarOSDoFormulario();
+        } finally {
+            this.salvandoOS = false;
+            botaoSalvar.disabled = false;
+            botaoSalvar.textContent = this.osEmEdicaoId ? "Salvar Alterações" : "Salvar Ordem";
+        }
+    }
+
+    async salvarOSDoFormulario() {
+
         // Extrai os valores finais dependendo de se o usuário usou as listas ou digitou
         let marcaFinal = this.ui.selectMarca.value === "OUTRA" ? this.ui.inputOutraMarca.value.trim().toUpperCase() : this.ui.selectMarca.value;
         let modeloFinal = (this.ui.selectMarca.value === "OUTRA" || this.ui.selectModelo.value === "OUTRO") ? this.ui.inputOutroModelo.value.trim().toUpperCase() : this.ui.selectModelo.value;
@@ -908,6 +896,7 @@ class App {
                 await this.bd.salvarNovaOS(dadosNovaOS);
                 mostrarToast("Ordem de serviço salva.");
             }
+            this.promessaOS = null; // a lista pré-carregada ficou velha
             this.ui.limparFormulario();
             this.renderizarCamposRepasse();
             // Se a IA extraiu mais OS, abre a próxima em vez de ir para a consulta
@@ -1038,31 +1027,40 @@ class App {
     }
 
    async carregarDadosIniciaisConsulta() {
-        document.getElementById("tabelaOSBody").innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Carregando ordens de serviço...</div>';
+        // Se já há uma lista de antes, mostra na hora e atualiza por trás; senão, mostra "carregando"
+        if (this.todasAsOS.length > 0) {
+            this.ordenarERenderizarOS();
+        } else {
+            document.getElementById("tabelaOSBody").innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Carregando ordens de serviço...</div>';
+        }
         try {
-            this.todasAsOS = await this.bd.buscarUltimasOS();
-            
-            // NOVA LÓGICA DE ORDENAÇÃO: Força a lista inteira a se organizar pela data da OS escolhida
-            this.todasAsOS.sort((a, b) => {
-                const dataA = (dataDaOS(a) || '0000-00-00');
-                const dataB = (dataDaOS(b) || '0000-00-00');
-                
-                // Se as datas do serviço forem iguais, desempata pela hora exata de salvamento
-                if (dataA === dataB) {
-                    const horaA = String(a.dataEntrada || '0000');
-                    const horaB = String(b.dataEntrada || '0000');
-                    return horaB.localeCompare(horaA);
-                }
-                // Ordena de forma decrescente (Maior/Mais nova sempre no topo)
-                return dataB.localeCompare(dataA); 
-            });
-
-            this.osFiltradas = [...this.todasAsOS]; // Começa mostrando todas
-            this.paginaAtual = 1;
-            this.renderizarTabelaOS();
+            // Na primeira vez, aproveita a busca já disparada ao entrar no sistema
+            const preCarregadas = this.promessaOS ? await this.promessaOS : null;
+            this.promessaOS = null;
+            this.todasAsOS = preCarregadas || await this.bd.buscarUltimasOS();
+            this.ordenarERenderizarOS();
         } catch (error) {
             document.getElementById("tabelaOSBody").innerHTML = '<div class="empty-state erro"><i class="bi bi-exclamation-triangle me-1"></i> Erro ao carregar do banco de dados.</div>';
         }
+    }
+
+    ordenarERenderizarOS() {
+        // Organiza a lista inteira pela data da OS escolhida (mais nova no topo)
+        this.todasAsOS.sort((a, b) => {
+            const dataA = (dataDaOS(a) || '0000-00-00');
+            const dataB = (dataDaOS(b) || '0000-00-00');
+
+            // Se as datas do serviço forem iguais, desempata pela hora exata de salvamento
+            if (dataA === dataB) {
+                const horaA = String(a.dataEntrada || '0000');
+                const horaB = String(b.dataEntrada || '0000');
+                return horaB.localeCompare(horaA);
+            }
+            return dataB.localeCompare(dataA);
+        });
+
+        // Reaplica os filtros que estiverem preenchidos (sem filtro, mostra todas)
+        this.aplicarFiltros();
     }
 
     aplicarFiltros() {
@@ -1386,6 +1384,8 @@ abrirModalDetalhes(id) {
         if (confirm(`Tem certeza que deseja EXCLUIR permanentemente a OS do veículo ${os.placa}?`)) {
             try {
                 await this.bd.excluirOS(os.id);
+                this.promessaOS = null;
+                this.todasAsOS = this.todasAsOS.filter(item => item.id !== os.id);
                 mostrarToast("Ordem de serviço excluída.");
                 
                 // Fecha modal
@@ -1714,29 +1714,6 @@ abrirModalDetalhes(id) {
         } finally {
             botao.disabled = false;
         }
-    }
-
-    // Oferece importar os dados do sistema antigo (só para o dono, só uma vez)
-    async verificarDadosAntigos() {
-        if (!this.ehDono || !(await this.bd.existemDadosAntigos())) return;
-        const aviso = document.getElementById("avisoDadosAntigos");
-        aviso.classList.remove("d-none");
-        document.getElementById("btnImportarAntigos").addEventListener("click", async (e) => {
-            const botao = e.currentTarget;
-            const progresso = document.getElementById("progressoImportacao");
-            if (!confirm(`Copiar todas as OS, veículos e funcionários do sistema antigo para "${this.sessao.oficina.nome}"?`)) return;
-            botao.disabled = true;
-            try {
-                const resumo = await this.bd.importarDadosAntigos(texto => progresso.textContent = `Copiando ${texto}...`);
-                aviso.classList.add("d-none");
-                mostrarToast(`Importado: ${resumo.ordens_servico} OS, ${resumo.veiculos} veículos e ${resumo.funcionarios} funcionários.`);
-                await this.carregarFuncionarios();
-            } catch (error) {
-                console.error("Erro na importação:", error);
-                progresso.textContent = "Erro ao importar. Nada foi perdido; tente de novo.";
-                botao.disabled = false;
-            }
-        });
     }
 
     // ==========================================
